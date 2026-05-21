@@ -392,7 +392,7 @@ void DebugController::showStepInSource(const QUrl& originalUrl, int originalLine
     const auto [url, line] = static_cast<IDebugSession*>(sender())->convertToLocalUrl({originalUrl, originalLine});
 
     const auto* const document = ICore::self()->documentController()->openDocument(url, KTextEditor::Cursor(line, 0),
-                                                                                   IDocumentController::DoNotFocus);
+                                                                                   IDocumentController::DefaultMode);
     if( !document )
         return;
 

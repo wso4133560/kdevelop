@@ -259,7 +259,15 @@ void DebugSession::handleVersion(const QStringList& s)
             continue; // this line is not a version string, skip it
         }
 
-        const auto match = versionRegExp.match(response);
+        // Some vendor builds prepend their toolchain version before the actual
+        // GDB version, e.g. "GNU gdb (T-HEAD C-SKY Tools V3.10.29 ...) 7.12".
+        // Use the last version-looking token on the GNU gdb line.
+        QRegularExpressionMatch match;
+        auto matches = versionRegExp.globalMatch(response);
+        while (matches.hasNext()) {
+            match = matches.next();
+        }
+
         if (match.hasMatch() && QVersionNumber::fromString(match.capturedView()) >= minRequiredVersion) {
             return; // Early exit. Version check passed.
         }

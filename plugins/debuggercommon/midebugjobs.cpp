@@ -27,6 +27,16 @@
 using namespace KDevMI;
 using namespace KDevelop;
 
+namespace {
+QString displayLaunchName(const QString& launchName)
+{
+    if (launchName == QLatin1String("CK803 ifftt remote")) {
+        return QStringLiteral("TR201 remote");
+    }
+    return launchName;
+}
+}
+
 template<class JobBase>
 MIDebugJobBase<JobBase>::MIDebugJobBase(MIDebuggerPlugin* plugin, QObject* parent)
     : JobBase(parent)
@@ -100,11 +110,12 @@ MIDebugJob::MIDebugJob(MIDebuggerPlugin* p, ILaunchConfiguration* launchcfg,
     // instead of being started. Raise the Build output tool view to show build error(s) in this scenario.
     m_session->setToolViewToRaiseAtEnd(IDebugSession::ToolView::Build);
 
+    const auto launchName = displayLaunchName(launchcfg->name());
     if (launchcfg->project()) {
         setObjectName(i18nc("ProjectName: run configuration name", "%1: %2",
-                            launchcfg->project()->name(), launchcfg->name()));
+                            launchcfg->project()->name(), launchName));
     } else {
-        setObjectName(launchcfg->name());
+        setObjectName(launchName);
     }
 }
 
@@ -127,7 +138,7 @@ void MIDebugJob::start()
     connect(m_session, &MIDebugSession::inferiorStdoutLines, model, &OutputModel::appendLines);
     connect(m_session, &MIDebugSession::inferiorStderrLines, model, &OutputModel::appendLines);
 
-    setTitle(m_startupInfo->launchConfiguration->name());
+    setTitle(displayLaunchName(m_startupInfo->launchConfiguration->name()));
 
     const auto grp = m_startupInfo->launchConfiguration->config();
     QString startWith = grp.readEntry(Config::StartWithEntry, QStringLiteral("ApplicationOutput"));

@@ -1,0 +1,10 @@
+{
+    "KPlugin": {
+        "Category": "Utilities",
+        "Description": "Adds a dockable serial port monitor to KDevelop.",
+        "Icon": "network-connect",
+        "Name": "Serial Port Monitor"
+    },
+    "X-KDevelop-Category": "Global",
+    "X-KDevelop-Mode": "GUI"
+}
