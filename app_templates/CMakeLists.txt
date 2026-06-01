@@ -8,6 +8,7 @@ kdevplatform_add_app_templates(
     cpp/QMake/qt5-qml2
     c/CMake/cmake_plainc
     c/meson/meson_plainc
+    c/riscv/riscv_layout
     empty
     kdevelop/file_template_template
 )

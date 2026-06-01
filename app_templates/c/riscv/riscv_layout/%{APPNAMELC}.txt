@@ -1,0 +1,1 @@
+Obj/lnk_crt0.o Obj/__rt_entry.o Obj/%{APPNAMELC}_main.o

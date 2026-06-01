@@ -41,8 +41,14 @@ Section "KDevelop application" SEC_APP
 
   Delete "$INSTDIR\pics\logo.png"
   Delete "$INSTDIR\pics\logo.ico"
+  Delete "$INSTDIR\lib\plugins\kdevplatform\66\kdevcraft.dll"
+  Delete "$INSTDIR\bin\data\kdevappwizard\templates\riscv_ifft_layout.tar.bz2"
+  Delete "$LOCALAPPDATA\kdevappwizard\template_descriptions\riscv_ifft_layout.kdevtemplate"
   SetOutPath "$INSTDIR"
   File /r "${APP_SOURCE}\app\*.*"
+
+  CreateDirectory "$LOCALAPPDATA\kdevappwizard\template_descriptions"
+  CopyFiles /SILENT "$INSTDIR\bin\data\kdevappwizard\template_descriptions\riscv_layout.kdevtemplate" "$LOCALAPPDATA\kdevappwizard\template_descriptions\riscv_layout.kdevtemplate"
 
   CreateDirectory "$SMPROGRAMS\RRISE"
   CreateShortcut "$SMPROGRAMS\RRISE\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\pics\rrise-logo.ico" 0

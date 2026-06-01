@@ -1,0 +1,2 @@
+module %{APPNAMEID}();
+endmodule

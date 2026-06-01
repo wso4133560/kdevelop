@@ -74,6 +74,24 @@
 namespace KDevelop
 {
 
+namespace {
+
+QUrl normalizeProjectUrl(const QUrl& inputUrl)
+{
+#ifdef Q_OS_WIN
+    if (!inputUrl.isLocalFile() && inputUrl.scheme().size() == 1 && inputUrl.scheme().at(0).isLetter() && inputUrl.host().isEmpty()) {
+        QString path = inputUrl.path();
+        if (path.startsWith(QLatin1Char('/'))) {
+            path.remove(0, 1);
+        }
+        return QUrl::fromLocalFile(inputUrl.scheme().toUpper() + QLatin1String(":/") + path);
+    }
+#endif
+    return inputUrl;
+}
+
+}
+
 class ProjectControllerPrivate
 {
 public:
@@ -287,7 +305,7 @@ public:
 
     void importProject(const QUrl& url_)
     {
-        QUrl url(url_);
+        QUrl url = normalizeProjectUrl(url_);
         if (url.isLocalFile()) {
             const QString path = QFileInfo(url.toLocalFile()).canonicalFilePath();
             if (!path.isEmpty()) {

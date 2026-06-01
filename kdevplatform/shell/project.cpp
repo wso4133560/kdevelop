@@ -13,6 +13,9 @@
 
 #include "project.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QSet>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -130,6 +133,7 @@ public:
     Path developerFile;
     QString developerTempFile;
     QTemporaryFile projectTempFile;
+    QString projectConfigSourceFile;
     IPlugin* manager = nullptr;
     QPointer<IPlugin> vcsPlugin;
     ProjectFolderItem* topItem = nullptr;
@@ -219,63 +223,86 @@ public:
 
     bool initProjectFiles()
     {
-        KIO::StatJob* statJob = KIO::stat( projectFile.toUrl(), KIO::HideProgressInfo );
-        if ( !statJob->exec() ) //be sync for right now
-        {
-            const QString messageText =
-                i18n("Unable to load the project file %1.<br>"
-                     "The project has been removed from the session.",
-                     projectFile.pathOrUrl());
-            auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
-            ICore::self()->uiController()->postMessage(message);
-            return false;
-        }
-
         // developerfile == dirname(projectFileUrl) ."/.kdev4/". basename(projectfileUrl)
         developerFile = projectFile;
         developerFile.setLastPathSegment( QStringLiteral(".kdev4") );
         developerFile.addPath( projectFile.lastPathSegment() );
 
-        statJob = KIO::stat( developerFile.toUrl(), KIO::HideProgressInfo );
-        if( !statJob->exec() )
-        {
-            // the developerfile does not exist yet, check if its folder exists
-            // the developerfile itself will get created below
-            QUrl dir = developerFile.parent().toUrl();
-            statJob = KIO::stat( dir, KIO::HideProgressInfo );
-            if( !statJob->exec() )
-            {
-                KIO::SimpleJob* mkdirJob = KIO::mkdir( dir );
-                if( !mkdirJob->exec() )
-                {
-                    const QString messageText =
-                        i18n("Unable to create hidden dir (%1) for developer file",
-                             dir.toDisplayString(QUrl::PreferLocalFile));
-                    auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
-                    ICore::self()->uiController()->postMessage(message);
-                    return false;
+        if (projectFile.isLocalFile()) {
+            const QFileInfo projectFileInfo(projectFile.toLocalFile());
+            if (!projectFileInfo.exists()) {
+                const QString messageText =
+                    i18n("Unable to load the project file %1.<br>"
+                         "The project has been removed from the session.",
+                         projectFile.pathOrUrl());
+                auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
+                ICore::self()->uiController()->postMessage(message);
+                return false;
+            }
+
+            const QString developerDir = developerFile.parent().toLocalFile();
+            if (!QDir(developerDir).exists() && !QDir().mkpath(developerDir)) {
+                const QString messageText =
+                    i18n("Unable to create hidden dir (%1) for developer file",
+                         developerFile.parent().pathOrUrl());
+                auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
+                ICore::self()->uiController()->postMessage(message);
+                return false;
+            }
+
+            projectConfigSourceFile = projectFile.toLocalFile();
+            developerTempFile = developerFile.toLocalFile();
+        } else {
+            if (!projectTempFile.open()) {
+                const QString messageText = i18n("Unable to create temporary storage for project file: %1", projectFile.pathOrUrl());
+                auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
+                ICore::self()->uiController()->postMessage(message);
+                return false;
+            }
+            const QString projectTempFileName = projectTempFile.fileName();
+            KIO::StatJob* statJob = KIO::stat(projectFile.toUrl(), KIO::HideProgressInfo);
+            if (!statJob->exec()) { //be sync for right now
+                const QString messageText =
+                    i18n("Unable to load the project file %1.<br>"
+                         "The project has been removed from the session.",
+                         projectFile.pathOrUrl());
+                auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
+                ICore::self()->uiController()->postMessage(message);
+                return false;
+            }
+
+            statJob = KIO::stat(developerFile.toUrl(), KIO::HideProgressInfo);
+            if (!statJob->exec()) {
+                // the developerfile does not exist yet, check if its folder exists
+                // the developerfile itself will get created below
+                QUrl dir = developerFile.parent().toUrl();
+                statJob = KIO::stat(dir, KIO::HideProgressInfo);
+                if (!statJob->exec()) {
+                    KIO::SimpleJob* mkdirJob = KIO::mkdir(dir);
+                    if (!mkdirJob->exec()) {
+                        const QString messageText =
+                            i18n("Unable to create hidden dir (%1) for developer file",
+                                 dir.toDisplayString(QUrl::PreferLocalFile));
+                        auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
+                        ICore::self()->uiController()->postMessage(message);
+                        return false;
+                    }
                 }
             }
-        }
 
-        projectTempFile.open();
-        auto copyJob = KIO::file_copy(projectFile.toUrl(), QUrl::fromLocalFile(projectTempFile.fileName()), -1, KIO::HideProgressInfo | KIO::Overwrite);
-        KJobWidgets::setWindow(copyJob, Core::self()->uiController()->activeMainWindow());
-        if (!copyJob->exec())
-        {
-            qCDebug(SHELL) << "Job failed:" << copyJob->errorString();
+            auto copyJob = KIO::file_copy(projectFile.toUrl(), QUrl::fromLocalFile(projectTempFileName), -1,
+                                          KIO::HideProgressInfo | KIO::Overwrite);
+            KJobWidgets::setWindow(copyJob, Core::self()->uiController()->activeMainWindow());
+            if (!copyJob->exec()) {
+                qCDebug(SHELL) << "Job failed:" << copyJob->errorString();
 
-            const QString messageText = i18n("Unable to get project file: %1", projectFile.pathOrUrl());
-            auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
-            ICore::self()->uiController()->postMessage(message);
-            return false;
-        }
+                const QString messageText = i18n("Unable to get project file: %1", projectFile.pathOrUrl());
+                auto* message = new Sublime::Message(messageText, Sublime::Message::Error);
+                ICore::self()->uiController()->postMessage(message);
+                return false;
+            }
 
-        if(developerFile.isLocalFile())
-        {
-            developerTempFile = developerFile.toLocalFile();
-        }
-        else {
+            projectConfigSourceFile = projectTempFileName;
             QTemporaryFile tmp;
             tmp.open();
             developerTempFile = tmp.fileName();
@@ -290,9 +317,9 @@ public:
     KConfigGroup initKConfigObject()
     {
         // helper method for open()
-        qCDebug(SHELL) << "Creating KConfig object for project files" << developerTempFile << projectTempFile.fileName();
+        qCDebug(SHELL) << "Creating KConfig object for project files" << developerTempFile << projectConfigSourceFile;
         m_cfg = KSharedConfig::openConfig( developerTempFile );
-        m_cfg->addConfigSources( QStringList() << projectTempFile.fileName() );
+        m_cfg->addConfigSources( QStringList() << projectConfigSourceFile );
         KConfigGroup projectGroup(m_cfg, QStringLiteral("Project"));
         return projectGroup;
     }

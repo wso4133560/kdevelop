@@ -1,0 +1,7 @@
+#ifndef %{APPNAMEUC}_PROJECT_CONFIG_H
+#define %{APPNAMEUC}_PROJECT_CONFIG_H
+
+#define PROJECT_NAME "%{APPNAME}"
+#define PROJECT_TARGET "%{APPNAMELC}"
+
+#endif

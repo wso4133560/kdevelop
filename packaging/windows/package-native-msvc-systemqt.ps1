@@ -77,6 +77,77 @@ function Copy-CraftRuntimeDlls([string]$SourceBin, [string]$DestBin) {
     }
 }
 
+function Copy-SystemQtKf6Overrides([string]$SourceBin, [string]$DestBin) {
+    if (-not (Test-Path -LiteralPath $SourceBin)) {
+        Write-Warning "System Qt KF6 override directory not found: $SourceBin"
+        return
+    }
+
+    $overrideDlls = @(
+        "KF6WidgetsAddons.dll",
+        "KF6SonnetCore.dll",
+        "KF6SonnetUi.dll",
+        "KF6SyntaxHighlighting.dll",
+        "KF6TextEditor.dll",
+        "KF6BreezeIcons.dll",
+        "KF6IconThemes.dll",
+        "KF6ColorScheme.dll",
+        "KF6XmlGui.dll"
+    )
+
+    foreach ($dll in $overrideDlls) {
+        $source = Join-Path $SourceBin $dll
+        if (-not (Test-Path -LiteralPath $source)) {
+            throw "Required system Qt KF6 override DLL not found: $source"
+        }
+
+        Copy-Item -LiteralPath $source -Destination (Join-Path $DestBin $dll) -Force
+    }
+}
+
+function Remove-RriseDisabledPlugins([string]$PayloadRoot) {
+    $plugins = @(
+        "lib\plugins\kdevplatform\66\kdevcraft.dll"
+    )
+
+    foreach ($plugin in $plugins) {
+        $path = Join-Path $PayloadRoot $plugin
+        if (Test-Path -LiteralPath $path) {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+}
+
+function Remove-RriseStaleTemplateArchives([string]$PayloadRoot) {
+    $archives = @(
+        "bin\data\kdevappwizard\templates\riscv_ifft_layout.tar.bz2"
+    )
+
+    foreach ($archive in $archives) {
+        $path = Join-Path $PayloadRoot $archive
+        if (Test-Path -LiteralPath $path) {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+}
+
+function Install-RriseTemplateDescriptions([string]$PayloadRoot) {
+    $templateRoot = Join-Path $PayloadRoot "bin\data\kdevappwizard"
+    $archive = Join-Path $templateRoot "templates\riscv_layout.tar.bz2"
+    Require-Path $archive "RISC-V template archive"
+
+    $descriptionDir = Join-Path $templateRoot "template_descriptions"
+    New-Item -ItemType Directory -Force -Path $descriptionDir | Out-Null
+
+    $tempDir = Join-Path $OutputRoot "template-description-extract"
+    Remove-DirectoryInside $tempDir $OutputRoot
+    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+
+    tar -xjf $archive -C $tempDir riscv_layout.kdevtemplate
+    Copy-Item -LiteralPath (Join-Path $tempDir "riscv_layout.kdevtemplate") `
+        -Destination (Join-Path $descriptionDir "riscv_layout.kdevtemplate") -Force
+}
+
 function Find-MakeNsis {
     $cmd = Get-Command makensis.exe -ErrorAction SilentlyContinue
     if ($cmd) {
@@ -315,6 +386,7 @@ $nsisScript = Join-Path $PSScriptRoot "kdevelop-installer.nsi"
 $qtBin = Join-Path $QtDir "bin"
 $windeployqt = Join-Path $qtBin "windeployqt.exe"
 $craftBin = Join-Path $CraftRoot "bin"
+$systemQtKf6Bin = "C:\tmp\systemqt-kf6\bin"
 if (-not $RiscvToolkitDir) {
     $RiscvToolkitDir = Join-Path ([IO.Path]::GetFullPath((Join-Path $repoRoot ".."))) "riscv_toolkit"
 }
@@ -354,6 +426,11 @@ Get-ChildItem -LiteralPath $appPayload -Recurse -File | ForEach-Object {
     }
 }
 
+Write-Host "Removing RRISE-disabled KDevelop plugins..."
+Remove-RriseDisabledPlugins $appPayload
+Remove-RriseStaleTemplateArchives $appPayload
+Install-RriseTemplateDescriptions $appPayload
+
 Write-Host "Copying RISC-V toolkit..."
 $toolkitPayload = Join-Path $appPayload "riscv_toolkit"
 New-Item -ItemType Directory -Force -Path $toolkitPayload | Out-Null
@@ -388,6 +465,8 @@ if (-not $SkipWindeployQt) {
 
 Write-Host "Copying non-Qt Craft runtime DLLs..."
 Copy-CraftRuntimeDlls $craftBin (Join-Path $appPayload "bin")
+Write-Host "Overriding selected KF6 runtime DLLs with system Qt builds..."
+Copy-SystemQtKf6Overrides $systemQtKf6Bin (Join-Path $appPayload "bin")
 
 Write-Host "Expanding CP210x driver package..."
 Add-Type -AssemblyName System.IO.Compression.FileSystem
