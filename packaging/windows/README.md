@@ -29,7 +29,7 @@ Produce a single installer exe that:
 Default output:
 
 - staging tree: `D:\tmp\kdevelop-native-installer\staging`
-- installer exe: `D:\tmp\kdevelop-native-installer\artifacts\KDevelop-CK803-Setup.exe`
+- installer exe: `D:\tmp\kdevelop-native-installer\artifacts\RRISE-Setup.exe`
 
 If NSIS is not installed yet, prepare and inspect staging only:
 

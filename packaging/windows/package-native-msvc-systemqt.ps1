@@ -4,7 +4,7 @@ param(
     [string]$QtDir = "C:\Qt\6.11.0\msvc2022_64",
     [string]$CraftRoot = "C:\CraftRoot",
     [string]$OutputRoot = "D:\tmp\kdevelop-native-installer",
-    [string]$InstallerName = "KDevelop-CK803-Setup.exe",
+    [string]$InstallerName = "RRISE-Setup.exe",
     [switch]$SkipWindeployQt,
     [switch]$SkipLauncherBuild,
     [switch]$SkipNsis,

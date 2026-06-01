@@ -9,13 +9,13 @@ Unicode true
 !endif
 
 !ifndef OUTFILE
-  !define OUTFILE "KDevelop-CK803-Setup.exe"
+  !define OUTFILE "RRISE-Setup.exe"
 !endif
 
-Name "KDevelop CK803"
+Name "RRISE"
 OutFile "${OUTFILE}"
-InstallDir "$PROGRAMFILES64\KDevelop CK803"
-InstallDirRegKey HKLM "Software\KDE e.V.\KDevelop CK803" "Install_Dir"
+InstallDir "$PROGRAMFILES64\RRISE"
+InstallDirRegKey HKLM "Software\KDE e.V.\RRISE" "Install_Dir"
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
@@ -40,15 +40,15 @@ Section "KDevelop application" SEC_APP
   SetOutPath "$INSTDIR"
   File /r "${APP_SOURCE}\app\*.*"
 
-  CreateDirectory "$SMPROGRAMS\KDevelop CK803"
-  CreateShortcut "$SMPROGRAMS\KDevelop CK803\KDevelop.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\bin\kdevelop.exe" 0
-  CreateShortcut "$DESKTOP\KDevelop CK803.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\bin\kdevelop.exe" 0
+  CreateDirectory "$SMPROGRAMS\RRISE"
+  CreateShortcut "$SMPROGRAMS\RRISE\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\bin\kdevelop.exe" 0
+  CreateShortcut "$DESKTOP\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\bin\kdevelop.exe" 0
 
-  WriteRegStr HKLM "Software\KDE e.V.\KDevelop CK803" "Install_Dir" "$INSTDIR"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\KDevelop CK803" "DisplayName" "KDevelop CK803"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\KDevelop CK803" "DisplayIcon" "$INSTDIR\bin\kdevelop.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\KDevelop CK803" "Publisher" "KDE e.V."
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\KDevelop CK803" "UninstallString" "$INSTDIR\Uninstall.exe"
+  WriteRegStr HKLM "Software\KDE e.V.\RRISE" "Install_Dir" "$INSTDIR"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "DisplayName" "RRISE"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "DisplayIcon" "$INSTDIR\bin\kdevelop.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "Publisher" "KDE e.V."
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
@@ -64,12 +64,12 @@ Section /o "CP210x USB-to-UART driver" SEC_CP210X
 SectionEnd
 
 Section "Uninstall"
-  Delete "$DESKTOP\KDevelop CK803.lnk"
-  Delete "$SMPROGRAMS\KDevelop CK803\KDevelop.lnk"
-  RMDir "$SMPROGRAMS\KDevelop CK803"
+  Delete "$DESKTOP\RRISE.lnk"
+  Delete "$SMPROGRAMS\RRISE\RRISE.lnk"
+  RMDir "$SMPROGRAMS\RRISE"
 
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\KDevelop CK803"
-  DeleteRegKey HKLM "Software\KDE e.V.\KDevelop CK803"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE"
+  DeleteRegKey HKLM "Software\KDE e.V.\RRISE"
 
   Delete "$INSTDIR\Uninstall.exe"
   RMDir /r "$INSTDIR"
