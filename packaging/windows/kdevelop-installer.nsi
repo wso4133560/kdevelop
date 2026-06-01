@@ -20,6 +20,8 @@ RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
 !define MUI_ABORTWARNING
+!define MUI_ICON "${APP_SOURCE}\app\pics\rrise-logo.ico"
+!define MUI_UNICON "${APP_SOURCE}\app\pics\rrise-logo.ico"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${APP_SOURCE}\drivers\CP210x\SLAB_License_Agreement_VCP_Windows.txt"
@@ -37,16 +39,18 @@ SetCompressor /SOLID lzma
 Section "KDevelop application" SEC_APP
   SectionIn RO
 
+  Delete "$INSTDIR\pics\logo.png"
+  Delete "$INSTDIR\pics\logo.ico"
   SetOutPath "$INSTDIR"
   File /r "${APP_SOURCE}\app\*.*"
 
   CreateDirectory "$SMPROGRAMS\RRISE"
-  CreateShortcut "$SMPROGRAMS\RRISE\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\bin\kdevelop.exe" 0
-  CreateShortcut "$DESKTOP\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\bin\kdevelop.exe" 0
+  CreateShortcut "$SMPROGRAMS\RRISE\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\pics\rrise-logo.ico" 0
+  CreateShortcut "$DESKTOP\RRISE.lnk" "$INSTDIR\KDevelop.exe" "" "$INSTDIR\pics\rrise-logo.ico" 0
 
   WriteRegStr HKLM "Software\KDE e.V.\RRISE" "Install_Dir" "$INSTDIR"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "DisplayName" "RRISE"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "DisplayIcon" "$INSTDIR\bin\kdevelop.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "DisplayIcon" "$INSTDIR\pics\rrise-logo.ico"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "Publisher" "KDE e.V."
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RRISE" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteUninstaller "$INSTDIR\Uninstall.exe"

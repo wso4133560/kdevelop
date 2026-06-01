@@ -9,6 +9,7 @@ Produce a single installer exe that:
 - installs the prepared KDevelop runtime tree,
 - bundles Qt/KF/Craft runtime dependencies so users do not configure Qt environment variables manually,
 - provides a selectable CP210x USB-to-UART driver component,
+- installs `pics\清科芯擎LOGO-中英文组合-黑.svg` and uses a generated `pics\rrise-logo.ico` for the installer, shortcuts, and uninstall entry,
 - creates shortcuts that start `KDevelop.exe`, a launcher that sets process-local runtime paths before starting `bin\kdevelop.exe`.
 
 ## Prerequisites
