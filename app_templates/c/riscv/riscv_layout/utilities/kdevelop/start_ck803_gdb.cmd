@@ -2,7 +2,7 @@
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-for %%I in ("%SCRIPT_DIR%..\..") do set "PROJECT_DIR=%%~fI"
+for %%%%I in ("%SCRIPT_DIR%..\..") do set "PROJECT_DIR=%%%%~fI"
 
 call "%SCRIPT_DIR%resolve_toolkit_root.cmd"
 if errorlevel 1 exit /b 1

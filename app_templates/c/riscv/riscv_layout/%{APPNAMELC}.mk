@@ -21,18 +21,19 @@ AR := csky-elfabiv2-ar
 OBJDUMP := csky-elfabiv2-objdump
 OBJCOPY := csky-elfabiv2-objcopy
 SIZE := csky-elfabiv2-size
+CHECKSUM := crc32
 
 CFLAGS := -mcpu=e803 -O0 -g -ffunction-sections -fdata-sections
 ASFLAGS := -mcpu=e803 -Wa,--gdwarf2
-LDFLAGS := -nostartfiles -Wl,--gc-sections -Tlnk/linker.ld -Wl,-zmax-page-size=1024
+LDFLAGS := -mcpu=e803 -nostartfiles -Wl,--gc-sections -Tlnk/linker.ld -Wl,-zmax-page-size=1024
 INCLUDES := -I. -Iinclude -Ilnk -Isrc \
-	-I$(SUPPORT_ROOT)/board/smartl_803_evb/include \
-	-I$(SUPPORT_ROOT)/csi_core/include \
-	-I$(SUPPORT_ROOT)/csi_driver/include \
-	-I$(SUPPORT_ROOT)/csi_driver/smartl/include \
-	-I$(SUPPORT_ROOT)/libs/include \
-	-I$(IFFT_SUPPORT_ROOT)/include
-LIBPATHS := -L$(IFFT_SUPPORT_ROOT)
+	-I"$(SUPPORT_ROOT)/board/smartl_803_evb/include" \
+	-I"$(SUPPORT_ROOT)/csi_core/include" \
+	-I"$(SUPPORT_ROOT)/csi_driver/include" \
+	-I"$(SUPPORT_ROOT)/csi_driver/smartl/include" \
+	-I"$(SUPPORT_ROOT)/libs/include" \
+	-I"$(IFFT_SUPPORT_ROOT)/include"
+LIBPATHS := -L"$(IFFT_SUPPORT_ROOT)"
 LIBS := -lth01A
 
 OBJECTS := \
@@ -46,7 +47,8 @@ all: $(IntermediateDirectory)/$(OutputFile).elf $(IntermediateDirectory)/$(Outpu
 	@echo size of target:
 	@$(SIZE) $(IntermediateDirectory)/$(OutputFile).elf
 	@echo -n checksum value of target:
-	@cmd /c %{APPNAMELC}.modify.bat $(IntermediateDirectory) $(OutputFile).elf
+	@$(CHECKSUM) $(IntermediateDirectory)/$(OutputFile).elf
+	@cmd //c %{APPNAMELC}.modify.bat $(IntermediateDirectory) $(OutputFile).elf
 
 $(IntermediateDirectory)/$(OutputFile).elf: $(OBJECTS) %{APPNAMELC}.txt
 	$(CC) -o $@ $(LDFLAGS) @$(ObjectsFileList) $(LIBPATHS) $(LIBS)
