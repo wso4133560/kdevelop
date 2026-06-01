@@ -19,16 +19,13 @@ if not exist "%MAKEFILE%" (
     exit /b 1
 )
 
-call :ToMsysPath "%PROJECT_DIR%" MSYS_PROJECT
-call :ToMsysPath "%RRISE_TOOLKIT_ROOT%" MSYS_TOOLKIT
-
 if exist "%PROJECT_DIR%\Obj" rmdir /s /q "%PROJECT_DIR%\Obj"
 if exist "%PROJECT_DIR%\Lst" rmdir /s /q "%PROJECT_DIR%\Lst"
 mkdir "%PROJECT_DIR%\Obj" >nul 2>nul
 mkdir "%PROJECT_DIR%\Lst" >nul 2>nul
 
 pushd "%PROJECT_DIR%"
-sh -lc "cd '%MSYS_PROJECT%' && RRISE_TOOLKIT_ROOT='%MSYS_TOOLKIT%' make-old -f '%{APPNAMELC}.mk'"
+sh -lc "cd '%PROJECT_DIR%' && RRISE_TOOLKIT_ROOT='%RRISE_TOOLKIT_ROOT%' make-old -f '%{APPNAMELC}.mk'"
 set "BUILD_RC=%ERRORLEVEL%"
 popd
 
@@ -48,12 +45,3 @@ if not "%BUILD_RC%"=="0" (
 
 echo SUCCESS: built %TARGET_NAME%
 exit /b 0
-
-:ToMsysPath
-setlocal
-set "WIN_PATH=%~1"
-set "DRIVE=%WIN_PATH:~0,1%"
-set "REST=%WIN_PATH:~2%"
-set "REST=%REST:\=/%"
-for %%L in (a b c d e f g h i j k l m n o p q r s t u v w x y z) do if /I "%%L"=="%DRIVE%" set "DRIVE=%%L"
-endlocal & set "%~2=/%DRIVE%%REST%" & exit /b 0

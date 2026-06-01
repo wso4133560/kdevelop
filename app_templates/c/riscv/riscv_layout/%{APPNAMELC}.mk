@@ -9,7 +9,7 @@ OutputFile := $(ProjectName)
 ObjectsFileList := %{APPNAMELC}.txt
 
 ifndef RRISE_TOOLKIT_ROOT
-$(error RRISE_TOOLKIT_ROOT is not set)
+$(error RRISE_TOOLKIT_ROOT is not set; build through Makefile or utilities/kdevelop/build_csky_target.cmd)
 endif
 
 SUPPORT_ROOT := $(RRISE_TOOLKIT_ROOT)/verify/ck803_sample
@@ -46,7 +46,7 @@ all: $(IntermediateDirectory)/$(OutputFile).elf $(IntermediateDirectory)/$(Outpu
 	@echo size of target:
 	@$(SIZE) $(IntermediateDirectory)/$(OutputFile).elf
 	@echo -n checksum value of target:
-	@cmd /c "%{APPNAMELC}.modify.bat $(IntermediateDirectory) $(OutputFile).elf"
+	@cmd /c %{APPNAMELC}.modify.bat $(IntermediateDirectory) $(OutputFile).elf
 
 $(IntermediateDirectory)/$(OutputFile).elf: $(OBJECTS) %{APPNAMELC}.txt
 	$(CC) -o $@ $(LDFLAGS) @$(ObjectsFileList) $(LIBPATHS) $(LIBS)
