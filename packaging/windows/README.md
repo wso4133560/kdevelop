@@ -17,6 +17,7 @@ Produce a single installer exe that:
 - Native install tree: `C:\tmp\kdevelop-native-msvc-install`
 - Qt: `C:\Qt\6.11.0\msvc2022_64`
 - Craft runtime DLL source: `C:\CraftRoot\bin`
+- RISC-V toolkit directory: `D:\code\kdevelop-commit\riscv_toolkit`
 - CP210x driver zip in the repository root: `CP210x_Windows_Drivers.zip`
 - Visual Studio C++ build tools, for compiling `KDevelop.exe` launcher
 - NSIS 3.x, for producing the final installer exe
@@ -25,6 +26,12 @@ Produce a single installer exe that:
 
 ```powershell
 .\packaging\windows\package-native-msvc-systemqt.ps1
+```
+
+Override the toolkit source directory if needed:
+
+```powershell
+.\packaging\windows\package-native-msvc-systemqt.ps1 -RiscvToolkitDir D:\path\to\riscv_toolkit
 ```
 
 Default output:
@@ -57,6 +64,8 @@ The packaged app root contains `KDevelop.exe`. This is not the real KDevelop bin
 - `QT_QUICK_CONTROLS_STYLE_PATH`
 
 These variables are not written globally to the user machine.
+
+The packaged app root also contains `riscv_toolkit\`, so templates can reference a stable installed path such as `C:\Program Files\RRISE\riscv_toolkit`.
 
 ## CP210x driver option
 

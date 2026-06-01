@@ -3,6 +3,7 @@ param(
     [string]$InstallTree = "C:\tmp\kdevelop-native-msvc-install",
     [string]$QtDir = "C:\Qt\6.11.0\msvc2022_64",
     [string]$CraftRoot = "C:\CraftRoot",
+    [string]$RiscvToolkitDir = "",
     [string]$OutputRoot = "D:\tmp\kdevelop-native-installer",
     [string]$InstallerName = "RRISE-Setup.exe",
     [switch]$SkipWindeployQt,
@@ -314,6 +315,9 @@ $nsisScript = Join-Path $PSScriptRoot "kdevelop-installer.nsi"
 $qtBin = Join-Path $QtDir "bin"
 $windeployqt = Join-Path $qtBin "windeployqt.exe"
 $craftBin = Join-Path $CraftRoot "bin"
+if (-not $RiscvToolkitDir) {
+    $RiscvToolkitDir = Join-Path ([IO.Path]::GetFullPath((Join-Path $repoRoot ".."))) "riscv_toolkit"
+}
 
 Require-Path $InstallTree "KDevelop install tree"
 Require-Path (Join-Path $InstallTree "bin\kdevelop.exe") "kdevelop.exe"
@@ -321,6 +325,7 @@ Require-Path $QtDir "Qt directory"
 Require-Path $qtBin "Qt bin directory"
 Require-Path $windeployqt "windeployqt.exe"
 Require-Path $craftBin "Craft bin directory"
+Require-Path $RiscvToolkitDir "RISC-V toolkit directory"
 Require-Path $cp210xZip "CP210x driver zip"
 Require-Path $logoSvg "RRISE logo"
 Require-Path $launcherSource "Launcher source"
@@ -344,6 +349,16 @@ New-Item -ItemType Directory -Force -Path $appPayload, $driverPayload, $artifact
 Write-Host "Copying KDevelop install tree..."
 Copy-Item -Path (Join-Path $InstallTree "*") -Destination $appPayload -Recurse -Force
 Get-ChildItem -LiteralPath $appPayload -Recurse -File | ForEach-Object {
+    if ($_.IsReadOnly) {
+        $_.IsReadOnly = $false
+    }
+}
+
+Write-Host "Copying RISC-V toolkit..."
+$toolkitPayload = Join-Path $appPayload "riscv_toolkit"
+New-Item -ItemType Directory -Force -Path $toolkitPayload | Out-Null
+Copy-Item -Path (Join-Path $RiscvToolkitDir "*") -Destination $toolkitPayload -Recurse -Force
+Get-ChildItem -LiteralPath $toolkitPayload -Recurse -File | ForEach-Object {
     if ($_.IsReadOnly) {
         $_.IsReadOnly = $false
     }
