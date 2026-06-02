@@ -11,6 +11,7 @@
 #include "breakpointmodel.h"
 
 #include <QIcon>
+#include <QPainter>
 #include <QPixmap>
 #include <QPointer>
 #include <QTimer>
@@ -611,27 +612,59 @@ void BreakpointModel::markChanged(KTextEditor::Document* document, KTextEditor::
 
 static constexpr int breakpointMarkPixmapSize = 32;
 
+static QPixmap makeBreakpointPixmap(QIcon::Mode mode)
+{
+    const QSize size(breakpointMarkPixmapSize, breakpointMarkPixmapSize);
+    QPixmap pixmap = QIcon::fromTheme(QStringLiteral("breakpoint")).pixmap(size, mode, QIcon::Off);
+    if (!pixmap.isNull()) {
+        return pixmap;
+    }
+
+    QPixmap fallback(size);
+    fallback.fill(Qt::transparent);
+
+    QColor fillColor(220, 28, 28);
+    QColor borderColor(130, 0, 0);
+    if (mode == QIcon::Disabled) {
+        fillColor = QColor(150, 150, 150);
+        borderColor = QColor(95, 95, 95);
+    } else if (mode == QIcon::Normal) {
+        fillColor = QColor(220, 72, 28);
+        borderColor = QColor(130, 45, 0);
+    } else if (mode == QIcon::Selected) {
+        fillColor = QColor(255, 184, 0);
+        borderColor = QColor(155, 105, 0);
+    }
+
+    QPainter painter(&fallback);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(borderColor, 2));
+    painter.setBrush(fillColor);
+    painter.drawEllipse(QRectF(6, 6, 20, 20));
+    return fallback;
+}
+
 const QPixmap* BreakpointModel::breakpointPixmap()
 {
-    static QPixmap pixmap=QIcon::fromTheme(QStringLiteral("breakpoint")).pixmap(QSize(breakpointMarkPixmapSize, breakpointMarkPixmapSize), QIcon::Active, QIcon::Off);
+    static QPixmap pixmap = makeBreakpointPixmap(QIcon::Active);
     return &pixmap;
 }
 
 const QPixmap* BreakpointModel::pendingBreakpointPixmap()
 {
-    static QPixmap pixmap=QIcon::fromTheme(QStringLiteral("breakpoint")).pixmap(QSize(breakpointMarkPixmapSize, breakpointMarkPixmapSize), QIcon::Normal, QIcon::Off);
+    static QPixmap pixmap = makeBreakpointPixmap(QIcon::Normal);
     return &pixmap;
 }
 
 const QPixmap* BreakpointModel::reachedBreakpointPixmap()
 {
-    static QPixmap pixmap=QIcon::fromTheme(QStringLiteral("breakpoint")).pixmap(QSize(breakpointMarkPixmapSize, breakpointMarkPixmapSize), QIcon::Selected, QIcon::Off);
+    static QPixmap pixmap = makeBreakpointPixmap(QIcon::Selected);
     return &pixmap;
 }
 
 const QPixmap* BreakpointModel::disabledBreakpointPixmap()
 {
-    static QPixmap pixmap=QIcon::fromTheme(QStringLiteral("breakpoint")).pixmap(QSize(breakpointMarkPixmapSize, breakpointMarkPixmapSize), QIcon::Disabled, QIcon::Off);
+    static QPixmap pixmap = makeBreakpointPixmap(QIcon::Disabled);
     return &pixmap;
 }
 

@@ -105,6 +105,15 @@ function Copy-SystemQtKf6Overrides([string]$SourceBin, [string]$DestBin) {
     }
 }
 
+function Copy-HicolorIconThemeIndex([string]$SourceBin, [string]$PayloadRoot) {
+    $source = Join-Path $SourceBin "data\icons\hicolor\index.theme"
+    Require-Path $source "hicolor icon theme index"
+
+    $destDir = Join-Path $PayloadRoot "bin\data\icons\hicolor"
+    New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+    Copy-Item -LiteralPath $source -Destination (Join-Path $destDir "index.theme") -Force
+}
+
 function Remove-RriseDisabledPlugins([string]$PayloadRoot) {
     $plugins = @(
         "lib\plugins\kdevplatform\66\kdevcraft.dll"
@@ -465,6 +474,8 @@ if (-not $SkipWindeployQt) {
 
 Write-Host "Copying non-Qt Craft runtime DLLs..."
 Copy-CraftRuntimeDlls $craftBin (Join-Path $appPayload "bin")
+Write-Host "Copying hicolor icon theme index..."
+Copy-HicolorIconThemeIndex $craftBin $appPayload
 Write-Host "Overriding selected KF6 runtime DLLs with system Qt builds..."
 Copy-SystemQtKf6Overrides $systemQtKf6Bin (Join-Path $appPayload "bin")
 
