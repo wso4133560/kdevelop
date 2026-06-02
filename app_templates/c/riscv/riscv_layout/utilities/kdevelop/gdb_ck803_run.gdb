@@ -1,4 +1,4 @@
 load
 set $pc = __start
-b main
-c
+tbreak main
+continue

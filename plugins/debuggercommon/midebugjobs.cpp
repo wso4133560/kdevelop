@@ -11,6 +11,7 @@
 #include "midebugjobs.h"
 
 #include "debuglog.h"
+#include "dbgglobal.h"
 #include "midebugsession.h"
 #include "midebuggerplugin.h"
 
@@ -23,6 +24,7 @@
 #include <KLocalizedString>
 
 #include <QFileInfo>
+#include <QUrl>
 
 using namespace KDevMI;
 using namespace KDevelop;
@@ -34,6 +36,13 @@ QString displayLaunchName(const QString& launchName)
         return QStringLiteral("TR201 remote");
     }
     return launchName;
+}
+
+bool usesRemoteGdbScripts(const KConfigGroup& grp)
+{
+    return grp.readEntry(GDB::Config::RemoteGdbConfigEntry, QUrl()).isValid()
+        || grp.readEntry(GDB::Config::RemoteGdbShellEntry, QUrl()).isValid()
+        || grp.readEntry(GDB::Config::RemoteGdbRunEntry, QUrl()).isValid();
 }
 }
 
@@ -176,7 +185,13 @@ void MIDebugJob::initializeStartupInfo(IExecutePlugin* execute, ILaunchConfigura
     if (detectError(InvalidExecutable)) {
         return;
     }
-    if (!QFileInfo{executable}.isExecutable()) {
+    const QFileInfo executableInfo{executable};
+    if (!executableInfo.exists()) {
+        setError(InvalidExecutable);
+        setErrorText(i18n("'%1' does not exist", executable));
+        return;
+    }
+    if (!executableInfo.isExecutable() && !usesRemoteGdbScripts(launchConfiguration->config())) {
         setError(ExecutableIsNotExecutable);
         setErrorText(i18n("'%1' is not an executable", executable));
         return;

@@ -34,8 +34,10 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QRegularExpression>
+#include <QThread>
 #include <QVersionNumber>
 
 using namespace KDevMI::GDB;
@@ -183,6 +185,15 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
 
     // handle remote debug
     if (configGdbScript.isValid()) {
+        const QFileInfo configScriptInfo(configGdbScript.toLocalFile());
+        const QString debugServerScript = configScriptInfo.dir().filePath(QStringLiteral("start_ck803_debugserver_39000.cmd"));
+        if (QFileInfo::exists(debugServerScript)) {
+            qCDebug(DEBUGGERGDB) << "starting CK803 debug server" << debugServerScript;
+            QProcess::startDetached(QStringLiteral("cmd.exe"),
+                                    {QStringLiteral("/c"), QStringLiteral("call"), QDir::toNativeSeparators(debugServerScript)},
+                                    configScriptInfo.dir().absolutePath());
+            QThread::msleep(1500);
+        }
         addCommand(MI::NonMI, QLatin1String("source ") + configGdbScript.toLocalFile());
     }
 

@@ -1,0 +1,75 @@
+[CustomBuildSystem]
+CurrentConfiguration=BuildConfig0
+
+[CustomBuildSystem][BuildConfig0]
+BuildDir=file:///%{PROJECTDIR}
+Title=RRISE CK803 %{APPNAMELC}
+
+[CustomBuildSystem][BuildConfig0][ToolBuild]
+Arguments=/c "%{PROJECTDIR}/utilities/kdevelop/build_all.cmd" %{APPNAMELC}
+Enabled=true
+Environment=
+Executable=file:///C:/Windows/System32/cmd.exe
+Type=0
+
+[CustomBuildSystem][BuildConfig0][ToolClean]
+Arguments=/c "%{PROJECTDIR}/utilities/kdevelop/clean_csky_target.cmd" %{APPNAMELC}
+Enabled=true
+Environment=
+Executable=file:///C:/Windows/System32/cmd.exe
+Type=3
+
+[CustomBuildSystem][BuildConfig0][ToolConfigure]
+Arguments=
+Enabled=false
+Environment=
+Executable=
+Type=1
+
+[CustomBuildSystem][BuildConfig0][ToolInstall]
+Arguments=
+Enabled=false
+Environment=
+Executable=
+Type=2
+
+[CustomBuildSystem][BuildConfig0][ToolPrune]
+Arguments=
+Enabled=false
+Environment=
+Executable=
+Type=4
+
+[Launch]
+Current Launch Config GroupName=Launch Configuration 0
+Current Launch Config Project=%{APPNAME}
+Launch Configurations=Launch Configuration 0
+
+[Launch][Launch Configuration 0]
+Configured Launch Modes=debug,execute
+Configured Launchers=gdb,nativeAppLauncher
+Name=RRISE CK803 Debug
+Type=Native Application
+
+[Launch][Launch Configuration 0][Data]
+Arguments=
+Break on Start=false
+ConfiguredByCTest=false
+Dependencies=
+Dependency Action=Nothing
+Display Demangle Names=true
+Display Static Members=false
+EnvironmentGroup=
+Executable=file:///C:/Windows/System32/cmd.exe
+External Terminal=
+GDB Path=file:///C:/Program Files/RRISE/riscv_toolkit/compiler/CKV2ElfMinilib_V3.10.29/bin/csky-elfabiv2-gdb.exe
+Kill Before Executing Again=0
+Remote GDB Config Script=file:///%{PROJECTDIR}/utilities/kdevelop/gdb_ck803_config.gdb
+Remote GDB Run Script=file:///%{PROJECTDIR}/utilities/kdevelop/gdb_ck803_run.gdb
+Start With=ApplicationOutput
+Use External Terminal=false
+Working Directory=file:///%{PROJECTDIR}
+isExecutable=true
+
+[Project]
+VersionControlSupport=

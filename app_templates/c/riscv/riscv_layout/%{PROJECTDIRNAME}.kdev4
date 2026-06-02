@@ -1,3 +1,3 @@
 [Project]
 Name=%{APPNAME}
-Manager=KDevCustomMakeManager
+Manager=KDevCustomBuildSystem

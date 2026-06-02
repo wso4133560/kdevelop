@@ -373,15 +373,25 @@ QString AppWizardPlugin::createProject(const ApplicationInfo& info)
         return QString();
     }
 
-    QString projectFileName = QDir::cleanPath(dest.toLocalFile() + QLatin1Char('/') + info.name + QLatin1String(".kdev4"));
+    const QString expectedProjectFileName = QDir::cleanPath(dest.toLocalFile() + QLatin1Char('/') + info.name + QLatin1String(".kdev4"));
+    QString projectFileName = expectedProjectFileName;
 
-    // Loop through the new project directory and try to detect the first .kdev4 file.
-    // If one is found this file will be used. So .kdev4 file can be stored in any subdirectory and the
-    // project templates can be more complex.
-    QDirIterator it(QDir::cleanPath( dest.toLocalFile()), QStringList() << QStringLiteral("*.kdev4"), QDir::NoFilter, QDirIterator::Subdirectories);
-    if(it.hasNext() == true)
-    {
-        projectFileName = it.next();
+    // Prefer the root project file. Private project configuration in .kdev4/<project>.kdev4
+    // must not become the project entry point.
+    if (!QFileInfo::exists(projectFileName)) {
+        QDirIterator it(QDir::cleanPath(dest.toLocalFile()),
+                        QStringList() << QStringLiteral("*.kdev4"),
+                        QDir::Files,
+                        QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            const QString candidate = it.next();
+            const QString privateConfigPath = QString(QDir::separator()) + QStringLiteral(".kdev4") + QString(QDir::separator());
+            if (QDir::toNativeSeparators(candidate).contains(privateConfigPath)) {
+                continue;
+            }
+            projectFileName = candidate;
+            break;
+        }
     }
 
     qCDebug(PLUGIN_APPWIZARD) << "Returning" << projectFileName << QFileInfo::exists( projectFileName ) ;

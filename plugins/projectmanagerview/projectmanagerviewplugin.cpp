@@ -439,10 +439,24 @@ QList<ProjectBaseItem*> ProjectManagerViewPlugin::collectItems()
             }
         }
 
-    } else
+    }
+
+    if (items.isEmpty())
     {
-        auto* ctx = static_cast<KDevelop::ProjectItemContext*>(ICore::self()->selectionController()->currentSelection());
-        items = ctx->items();
+        auto* ctx = dynamic_cast<KDevelop::ProjectItemContext*>(ICore::self()->selectionController()->currentSelection());
+        if (ctx) {
+            items = ctx->items();
+        }
+    }
+
+    if (items.isEmpty()) {
+        const auto projects = ICore::self()->projectController()->projects();
+        items.reserve(projects.size());
+        for (IProject* project : projects) {
+            if (project->projectItem()) {
+                items << project->projectItem();
+            }
+        }
     }
 
     return items;

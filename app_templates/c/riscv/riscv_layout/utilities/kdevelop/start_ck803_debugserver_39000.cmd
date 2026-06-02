@@ -1,6 +1,12 @@
 @echo off
 setlocal
 
+netstat -ano | findstr /R /C:":39000 .*LISTENING" >nul 2>nul
+if not errorlevel 1 (
+    echo DebugServer already listening on port 39000
+    exit /b 0
+)
+
 set "SCRIPT_DIR=%~dp0"
 call "%SCRIPT_DIR%resolve_toolkit_root.cmd"
 if errorlevel 1 exit /b 1

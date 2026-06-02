@@ -127,6 +127,7 @@ public:
     QMap<QString,ILaunchMode*> launchModes;
     QMap<int,QPair<QString,QString> > launchAsInfo;
     KDevelop::ProjectBaseItem* contextItem;
+    KDevelop::IProject* lastOpenedProject;
     DebugMode* debugMode;
     ExecuteMode* executeMode;
     ProfileMode* profileMode;
@@ -261,6 +262,39 @@ public:
         action->setData(QVariant::fromValue<void*>(l));
     }
 
+    bool selectProjectLaunch(IProject* project)
+    {
+        if (!project) {
+            return false;
+        }
+
+        const auto it = std::find_if(launchConfigurations.constBegin(), launchConfigurations.constEnd(),
+                                     [project](LaunchConfiguration* launch) {
+            return launch->project() == project;
+        });
+        if (it == launchConfigurations.constEnd()) {
+            return false;
+        }
+
+        q->setDefaultLaunch(*it);
+        saveCurrentLaunchAction();
+        return true;
+    }
+
+    bool selectDefaultProjectLaunch()
+    {
+        if (selectProjectLaunch(lastOpenedProject)) {
+            return true;
+        }
+
+        const auto projects = Core::self()->projectController()->projects();
+        if (projects.size() == 1) {
+            return selectProjectLaunch(projects.constFirst());
+        }
+
+        return false;
+    }
+
     /**
      * Read launch configurations from the session config, all open project configs,
      * and add them to the list of all available launch configurations.
@@ -347,6 +381,7 @@ RunController::RunController(QObject *parent)
     d->q = this;
     d->delegate = new RunDelegate(this);
     d->contextItem = nullptr;
+    d->lastOpenedProject = nullptr;
     d->executeMode = nullptr;
     d->debugMode = nullptr;
     d->profileMode = nullptr;
@@ -525,7 +560,9 @@ void KDevelop::RunController::slotProjectOpened(KDevelop::IProject * project)
 {
     Q_D(RunController);
 
+    d->lastOpenedProject = project;
     d->readProjectLaunchConfigurations(project);
+    d->selectProjectLaunch(project);
     d->updateCurrentLaunchAction();
 }
 
@@ -559,6 +596,7 @@ void RunController::debugCurrentLaunch()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
+        d->selectDefaultProjectLaunch();
         executeDefaultLaunch( QStringLiteral("debug") );
     }
 }
@@ -572,6 +610,7 @@ void RunController::slotProfile()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
+        d->selectDefaultProjectLaunch();
         executeDefaultLaunch( QStringLiteral("profile") );
     }
 }
@@ -585,6 +624,7 @@ void RunController::slotExecute()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
+        d->selectDefaultProjectLaunch();
         executeDefaultLaunch( QStringLiteral("execute") );
     }
 }
@@ -822,6 +862,7 @@ void RunController::addConfigurationType( LaunchConfigurationType* type )
     }
     qCDebug(SHELL).nospace() << "added configuration type " << typeId << ", reading launch configurations of this type";
     d->readAllLaunchConfigurations(typeId);
+    d->selectDefaultProjectLaunch();
     d->updateCurrentLaunchAction();
 }
 

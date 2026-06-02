@@ -26,20 +26,25 @@ macro(kdevplatform_create_template_archive _templateName)
     get_filename_component(_baseName ${_tmp_file} NAME_WE)
     set(_template ${CMAKE_CURRENT_BINARY_DIR}/${_baseName}.tar.bz2)
 
-    file(GLOB _files "${CMAKE_CURRENT_SOURCE_DIR}/${_templateName}/*")
+    file(GLOB _files
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_templateName}/*"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_templateName}/.*"
+    )
     set(_deps)
     foreach(_file ${_files})
         get_filename_component(_fileName ${_file} NAME)
         string(COMPARE NOTEQUAL ${_fileName} .kdev_ignore _v1)
+        string(COMPARE NOTEQUAL ${_fileName} . _vDot)
+        string(COMPARE NOTEQUAL ${_fileName} .. _vDotDot)
         string(REGEX MATCH "\\.svn" _v2 ${_fileName} )
         if(WIN32)
             string(REGEX MATCH "_svn" _v3 ${_fileName} )
         else()
             set(_v3 FALSE)
         endif()
-        if ( _v1 AND NOT _v2 AND NOT _v3 )
+        if ( _v1 AND _vDot AND _vDotDot AND NOT _v2 AND NOT _v3 )
             set(_deps ${_deps} ${_file})
-        endif ( _v1 AND NOT _v2 AND NOT _v3 )
+        endif ( _v1 AND _vDot AND _vDotDot AND NOT _v2 AND NOT _v3 )
     endforeach(_file)
     list(SORT _deps)
 
