@@ -105,6 +105,40 @@ function Copy-SystemQtKf6Overrides([string]$SourceBin, [string]$DestBin) {
     }
 }
 
+function Copy-QtRuntimeDlls([string]$QtBin, [string]$DestBin) {
+    $dlls = @(
+        "Qt6TextToSpeech.dll",
+        "Qt6Multimedia.dll",
+        "Qt6MultimediaWidgets.dll"
+    )
+
+    foreach ($dll in $dlls) {
+        $source = Join-Path $QtBin $dll
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $DestBin $dll) -Force
+        } else {
+            Write-Warning "Optional Qt runtime DLL not found: $source"
+        }
+    }
+}
+
+function Copy-QtPluginType([string]$QtDir, [string]$DestBin, [string]$PluginType) {
+    $sourceDir = Join-Path $QtDir "plugins\$PluginType"
+    if (-not (Test-Path -LiteralPath $sourceDir)) {
+        Write-Warning "Optional Qt plugin directory not found: $sourceDir"
+        return
+    }
+
+    $destDir = Join-Path $DestBin $PluginType
+    New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+
+    Get-ChildItem -LiteralPath $sourceDir -Filter "*.dll" -File | Where-Object {
+        $_.BaseName -notlike "*d"
+    } | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destDir $_.Name) -Force
+    }
+}
+
 function Copy-HicolorIconThemeIndex([string]$SourceBin, [string]$PayloadRoot) {
     $source = Join-Path $SourceBin "data\icons\hicolor\index.theme"
     Require-Path $source "hicolor icon theme index"
@@ -471,6 +505,11 @@ if (-not $SkipWindeployQt) {
         throw "windeployqt failed with exit code $LASTEXITCODE"
     }
 }
+
+Write-Host "Copying extra Qt runtime modules..."
+Copy-QtRuntimeDlls $qtBin (Join-Path $appPayload "bin")
+Copy-QtPluginType $QtDir (Join-Path $appPayload "bin") "texttospeech"
+Copy-QtPluginType $QtDir (Join-Path $appPayload "bin") "multimedia"
 
 Write-Host "Copying non-Qt Craft runtime DLLs..."
 Copy-CraftRuntimeDlls $craftBin (Join-Path $appPayload "bin")
