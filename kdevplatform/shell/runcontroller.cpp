@@ -262,27 +262,46 @@ public:
         action->setData(QVariant::fromValue<void*>(l));
     }
 
-    bool selectProjectLaunch(IProject* project)
+    LaunchConfiguration* launchFromCurrentAction() const
+    {
+        if (!currentTargetAction || !currentTargetAction->currentAction()) {
+            return nullptr;
+        }
+
+        return static_cast<LaunchConfiguration*>(currentTargetAction->currentAction()->data().value<void*>());
+    }
+
+    LaunchConfiguration* projectLaunch(IProject* project) const
     {
         if (!project) {
-            return false;
+            return nullptr;
         }
 
         const auto it = std::find_if(launchConfigurations.constBegin(), launchConfigurations.constEnd(),
                                      [project](LaunchConfiguration* launch) {
             return launch->project() == project;
         });
-        if (it == launchConfigurations.constEnd()) {
+        return it == launchConfigurations.constEnd() ? nullptr : *it;
+    }
+
+    bool selectProjectLaunch(IProject* project)
+    {
+        auto* launch = projectLaunch(project);
+        if (!launch) {
             return false;
         }
 
-        q->setDefaultLaunch(*it);
+        q->setDefaultLaunch(launch);
         saveCurrentLaunchAction();
         return true;
     }
 
     bool selectDefaultProjectLaunch()
     {
+        if (auto* currentLaunch = launchFromCurrentAction(); currentLaunch && currentLaunch->project()) {
+            return true;
+        }
+
         if (selectProjectLaunch(lastOpenedProject)) {
             return true;
         }
@@ -293,6 +312,30 @@ public:
         }
 
         return false;
+    }
+
+    LaunchConfiguration* preferredLaunch()
+    {
+        if (auto* currentLaunch = launchFromCurrentAction(); currentLaunch && currentLaunch->project()) {
+            return currentLaunch;
+        }
+
+        if (auto* launch = projectLaunch(lastOpenedProject)) {
+            q->setDefaultLaunch(launch);
+            saveCurrentLaunchAction();
+            return launch;
+        }
+
+        const auto projects = Core::self()->projectController()->projects();
+        if (projects.size() == 1) {
+            if (auto* launch = projectLaunch(projects.constFirst())) {
+                q->setDefaultLaunch(launch);
+                saveCurrentLaunchAction();
+                return launch;
+            }
+        }
+
+        return launchFromCurrentAction();
     }
 
     /**
@@ -562,8 +605,9 @@ void KDevelop::RunController::slotProjectOpened(KDevelop::IProject * project)
 
     d->lastOpenedProject = project;
     d->readProjectLaunchConfigurations(project);
-    d->selectProjectLaunch(project);
-    d->updateCurrentLaunchAction();
+    if (!d->selectProjectLaunch(project)) {
+        d->updateCurrentLaunchAction();
+    }
 }
 
 void KDevelop::RunController::slotProjectClosing(KDevelop::IProject * project)
@@ -596,8 +640,7 @@ void RunController::debugCurrentLaunch()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
-        d->selectDefaultProjectLaunch();
-        executeDefaultLaunch( QStringLiteral("debug") );
+        execute(QStringLiteral("debug"), d->preferredLaunch());
     }
 }
 
@@ -610,8 +653,7 @@ void RunController::slotProfile()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
-        d->selectDefaultProjectLaunch();
-        executeDefaultLaunch( QStringLiteral("profile") );
+        execute(QStringLiteral("profile"), d->preferredLaunch());
     }
 }
 
@@ -624,8 +666,7 @@ void RunController::slotExecute()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
-        d->selectDefaultProjectLaunch();
-        executeDefaultLaunch( QStringLiteral("execute") );
+        execute(QStringLiteral("execute"), d->preferredLaunch());
     }
 }
 
@@ -862,8 +903,9 @@ void RunController::addConfigurationType( LaunchConfigurationType* type )
     }
     qCDebug(SHELL).nospace() << "added configuration type " << typeId << ", reading launch configurations of this type";
     d->readAllLaunchConfigurations(typeId);
-    d->selectDefaultProjectLaunch();
-    d->updateCurrentLaunchAction();
+    if (!d->selectDefaultProjectLaunch()) {
+        d->updateCurrentLaunchAction();
+    }
 }
 
 void RunController::removeConfigurationType( LaunchConfigurationType* type )

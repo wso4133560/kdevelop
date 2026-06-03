@@ -36,9 +36,19 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_LANGUAGE "SimpChinese"
 !insertmacro MUI_LANGUAGE "English"
 
+Function KillDebugServerConsole
+  DetailPrint "Stopping DebugServerConsole.exe if it is running..."
+  nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DebugServerConsole.exe /T'
+FunctionEnd
+
+Function .onInit
+  Call KillDebugServerConsole
+FunctionEnd
+
 Section "KDevelop application" SEC_APP
   SectionIn RO
 
+  Call KillDebugServerConsole
   Delete "$INSTDIR\pics\logo.png"
   Delete "$INSTDIR\pics\logo.ico"
   Delete "$INSTDIR\lib\plugins\kdevplatform\66\kdevcraft.dll"

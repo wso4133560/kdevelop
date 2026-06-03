@@ -26,7 +26,9 @@
 #include <interfaces/icore.h>
 #include <interfaces/idebugcontroller.h>
 #include <interfaces/ilaunchconfiguration.h>
+#include <interfaces/iproject.h>
 #include <util/environmentprofilelist.h>
+#include <util/path.h>
 
 #include <KConfigGroup>
 #include <KLocalizedString>
@@ -43,6 +45,34 @@
 using namespace KDevMI::GDB;
 using namespace KDevMI::MI;
 using namespace KDevelop;
+
+namespace {
+QString resolveLaunchLocalPath(const QUrl& url, KDevelop::ILaunchConfiguration* cfg, IExecutePlugin* iexec)
+{
+    if (url.isEmpty()) {
+        return {};
+    }
+
+    if (url.isLocalFile()) {
+        return url.toLocalFile();
+    }
+
+    const QString path = url.toString();
+    if (QDir::isAbsolutePath(path)) {
+        return QDir::cleanPath(path);
+    }
+
+    QString baseDir = iexec->workingDirectory(cfg).toLocalFile();
+    if (baseDir.isEmpty() && cfg->project()) {
+        baseDir = cfg->project()->path().toLocalFile();
+    }
+    if (baseDir.isEmpty()) {
+        return path;
+    }
+
+    return QDir(baseDir).absoluteFilePath(path);
+}
+}
 
 DebugSession::DebugSession()
 {
@@ -174,18 +204,21 @@ void DebugSession::configInferior(ILaunchConfiguration *cfg, IExecutePlugin *iex
     qCDebug(DEBUGGERGDB) << "Per inferior configuration done";
 }
 
-bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlugin *, const QString &executable)
+bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlugin *iexec, const QString &executable)
 {
     qCDebug(DEBUGGERGDB) << "Executing inferior";
 
     KConfigGroup grp = cfg->config();
-    QUrl configGdbScript = grp.readEntry(Config::RemoteGdbConfigEntry, QUrl());
-    QUrl runShellScript = grp.readEntry(Config::RemoteGdbShellEntry, QUrl());
-    QUrl runGdbScript = grp.readEntry(Config::RemoteGdbRunEntry, QUrl());
+    const QUrl configGdbScriptUrl = grp.readEntry(Config::RemoteGdbConfigEntry, QUrl());
+    const QUrl runShellScriptUrl = grp.readEntry(Config::RemoteGdbShellEntry, QUrl());
+    const QUrl runGdbScriptUrl = grp.readEntry(Config::RemoteGdbRunEntry, QUrl());
+    const QString configGdbScript = resolveLaunchLocalPath(configGdbScriptUrl, cfg, iexec);
+    const QString runShellScript = resolveLaunchLocalPath(runShellScriptUrl, cfg, iexec);
+    const QString runGdbScript = resolveLaunchLocalPath(runGdbScriptUrl, cfg, iexec);
 
     // handle remote debug
-    if (configGdbScript.isValid()) {
-        const QFileInfo configScriptInfo(configGdbScript.toLocalFile());
+    if (!configGdbScript.isEmpty()) {
+        const QFileInfo configScriptInfo(configGdbScript);
         const QString debugServerScript = configScriptInfo.dir().filePath(QStringLiteral("start_ck803_debugserver_39000.cmd"));
         if (QFileInfo::exists(debugServerScript)) {
             qCDebug(DEBUGGERGDB) << "starting CK803 debug server" << debugServerScript;
@@ -194,25 +227,25 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
                                     configScriptInfo.dir().absolutePath());
             QThread::msleep(1500);
         }
-        addCommand(MI::NonMI, QLatin1String("source ") + configGdbScript.toLocalFile());
+        addCommand(MI::NonMI, QLatin1String("source ") + configGdbScript);
     }
 
     // FIXME: have a check box option that controls remote debugging
-    if (runShellScript.isValid()) {
+    if (!runShellScript.isEmpty()) {
         // Special for remote debug, the remote inferior is started by this shell script
         const auto tty = m_tty->getSlave();
         const auto options = QString(QLatin1String(">") + tty + QLatin1String("  2>&1 <") + tty);
 
         const QStringList arguments {
             QStringLiteral("-c"),
-            KShell::quoteArg(runShellScript.toLocalFile()) + QLatin1Char(' ') + KShell::quoteArg(executable) + options,
+            KShell::quoteArg(runShellScript) + QLatin1Char(' ') + KShell::quoteArg(executable) + options,
         };
 
         qCDebug(DEBUGGERGDB) << "starting sh" << arguments;
         QProcess::startDetached(QStringLiteral("sh"), arguments);
     }
 
-    if (runGdbScript.isValid()) {
+    if (!runGdbScript.isEmpty()) {
         // Special for remote debug, gdb script at run is requested, to connect to remote inferior
 
         // Race notice: wait for the remote gdbserver/executable
@@ -228,10 +261,10 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
                 breakpointController()->initSendBreakpoints();
 
                 breakpointController()->setDeleteDuplicateBreakpoints(true);
-                qCDebug(DEBUGGERGDB) << "Running gdb script " << KShell::quoteArg(runGdbScript.toLocalFile());
+                qCDebug(DEBUGGERGDB) << "Running gdb script " << KShell::quoteArg(runGdbScript);
 
                 addCommand(
-                    MI::NonMI, QLatin1String("source ") + runGdbScript.toLocalFile(),
+                    MI::NonMI, QLatin1String("source ") + runGdbScript,
                     [this](const MI::ResultRecord&) { breakpointController()->setDeleteDuplicateBreakpoints(false); },
                     CmdMaybeStartsRunning);
                 raiseEvent(connected_to_program);

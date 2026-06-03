@@ -89,8 +89,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
     const std::wstring root = dirname(launcherPath);
     const std::wstring binDir = root + L"\\bin";
+    const std::wstring toolkitRoot = root + L"\\riscv_toolkit";
     const std::wstring toolkitMsysBin = root + L"\\riscv_toolkit\\runtime\\msys_bin";
     const std::wstring toolkitMsysRootBin = root + L"\\riscv_toolkit\\runtime\\msys_root\\bin";
+    const std::wstring thuCompilerRoot = root + L"\\thu-compiler";
     const std::wstring kdevelopExe = binDir + L"\\kdevelop.exe";
 
     if (GetFileAttributesW(kdevelopExe.c_str()) == INVALID_FILE_ATTRIBUTES) {
@@ -100,6 +102,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     prependEnv(L"PATH", binDir);
     prependEnv(L"PATH", toolkitMsysRootBin);
     prependEnv(L"PATH", toolkitMsysBin);
+    SetEnvironmentVariableW(L"RRISE_TOOLKIT_ROOT", toolkitRoot.c_str());
+    SetEnvironmentVariableW(L"THU_COMPILER_ROOT", thuCompilerRoot.c_str());
     SetEnvironmentVariableW(L"KDEDIRS", root.c_str());
     SetEnvironmentVariableW(L"XDG_DATA_DIRS", (binDir + L"\\data;" + root + L"\\share").c_str());
     SetEnvironmentVariableW(L"XDG_CONFIG_DIRS", (root + L"\\etc\\xdg").c_str());

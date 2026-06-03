@@ -22,11 +22,68 @@
 #include <KShell>
 
 #include <QApplication>
+#include <QDir>
 #include <QFileInfo>
+#include <QProcessEnvironment>
 #include <QUrl>
 
 using namespace KDevMI::GDB;
 using namespace KDevMI::MI;
+
+namespace {
+QString expandWindowsEnvironmentVariables(QString value)
+{
+#ifdef Q_OS_WIN
+    const auto environment = QProcessEnvironment::systemEnvironment();
+    qsizetype searchFrom = 0;
+    while (true) {
+        const qsizetype start = value.indexOf(QLatin1Char('%'), searchFrom);
+        if (start < 0) {
+            break;
+        }
+
+        const qsizetype end = value.indexOf(QLatin1Char('%'), start + 1);
+        if (end < 0) {
+            break;
+        }
+
+        const QString name = value.mid(start + 1, end - start - 1);
+        const QString replacement = environment.value(name);
+        if (replacement.isEmpty()) {
+            searchFrom = end + 1;
+            continue;
+        }
+
+        value.replace(start, end - start + 1, replacement);
+        searchFrom = start + replacement.size();
+    }
+#endif
+    return value;
+}
+
+QString resolveDebuggerExecutable(const QString& rawValue)
+{
+    if (rawValue.isEmpty()) {
+        return {};
+    }
+
+    const QUrl url(rawValue);
+    if (url.isLocalFile()) {
+        return url.toLocalFile();
+    }
+
+    const QString expanded = expandWindowsEnvironmentVariables(rawValue);
+    const QUrl expandedUrl(expanded);
+    if (expandedUrl.isLocalFile()) {
+        return expandedUrl.toLocalFile();
+    }
+    if (QDir::isAbsolutePath(expanded)) {
+        return QDir::cleanPath(expanded);
+    }
+
+    return expanded;
+}
+}
 
 GdbDebugger::GdbDebugger(QObject* parent)
     : MIDebugger(parent)
@@ -40,12 +97,11 @@ GdbDebugger::~GdbDebugger()
 bool GdbDebugger::start(KConfigGroup& config, const QStringList& extraArguments)
 {
     // FIXME: verify that default value leads to something sensible
-    QUrl gdbUrl = config.readEntry(Config::GdbPathEntry, QUrl());
-    if (gdbUrl.isEmpty()) {
+    const QString configuredGdb = resolveDebuggerExecutable(config.readEntry(Config::GdbPathEntry, QString()));
+    if (configuredGdb.isEmpty()) {
         m_debuggerExecutable = QStringLiteral("gdb");
     } else {
-        // FIXME: verify its' a local path.
-        m_debuggerExecutable = gdbUrl.url(QUrl::PreferLocalFile | QUrl::StripTrailingSlash);
+        m_debuggerExecutable = configuredGdb;
     }
 
     QStringList arguments = extraArguments;

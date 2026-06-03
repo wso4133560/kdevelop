@@ -20,7 +20,65 @@
 #include "custombuildsystemplugin.h"
 #include "configconstants.h"
 
+#include <QDir>
+#include <QProcessEnvironment>
+
 using namespace KDevelop;
+
+namespace {
+QString expandWindowsEnvironmentVariables(QString value)
+{
+#ifdef Q_OS_WIN
+    const auto environment = QProcessEnvironment::systemEnvironment();
+    qsizetype searchFrom = 0;
+    while (true) {
+        const qsizetype start = value.indexOf(QLatin1Char('%'), searchFrom);
+        if (start < 0) {
+            break;
+        }
+
+        const qsizetype end = value.indexOf(QLatin1Char('%'), start + 1);
+        if (end < 0) {
+            break;
+        }
+
+        const QString name = value.mid(start + 1, end - start - 1);
+        const QString replacement = environment.value(name);
+        if (replacement.isEmpty()) {
+            searchFrom = end + 1;
+            continue;
+        }
+
+        value.replace(start, end - start + 1, replacement);
+        searchFrom = start + replacement.size();
+    }
+#endif
+    return value;
+}
+
+QString resolveConfiguredCommand(const QString& rawValue)
+{
+    if (rawValue.isEmpty()) {
+        return {};
+    }
+
+    const QUrl url(rawValue);
+    if (url.isLocalFile()) {
+        return url.toLocalFile();
+    }
+
+    const QString expanded = expandWindowsEnvironmentVariables(rawValue);
+    const QUrl expandedUrl(expanded);
+    if (expandedUrl.isLocalFile()) {
+        return expandedUrl.toLocalFile();
+    }
+    if (QDir::isAbsolutePath(expanded)) {
+        return QDir::cleanPath(expanded);
+    }
+
+    return expanded;
+}
+}
 
 CustomBuildJob::CustomBuildJob( CustomBuildSystem* plugin, KDevelop::ProjectBaseItem* item, CustomBuildSystemTool::ActionType t )
     : OutputJob( plugin )
@@ -56,7 +114,7 @@ CustomBuildJob::CustomBuildJob( CustomBuildSystem* plugin, KDevelop::ProjectBase
     if(g.isValid()) {
         KConfigGroup grp = g.group( subgrpname );
         enabled = grp.readEntry(ConfigConstants::toolEnabled(), false);
-        cmd = grp.readEntry(ConfigConstants::toolExecutable(), QUrl()).toLocalFile();
+        cmd = resolveConfiguredCommand(grp.readEntry(ConfigConstants::toolExecutable(), QString()));
         environment = grp.readEntry(ConfigConstants::toolEnvironment(), QString());
         arguments = grp.readEntry(ConfigConstants::toolArguments(), QString());
     }

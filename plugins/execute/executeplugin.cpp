@@ -13,6 +13,7 @@
 #include <interfaces/icore.h>
 #include <interfaces/iruncontroller.h>
 #include <interfaces/ilaunchconfiguration.h>
+#include <interfaces/iproject.h>
 #include <interfaces/iprojectcontroller.h>
 #include <interfaces/iuicontroller.h>
 #include <sublime/message.h>
@@ -22,9 +23,68 @@
 #include <project/projectmodel.h>
 #include <project/builderjob.h>
 #include <util/kdevstringhandler.h>
+#include <util/path.h>
 #include <util/shellutils.h>
 
+#include <QDir>
+#include <QProcessEnvironment>
+
 using namespace KDevelop;
+
+namespace {
+QString expandWindowsEnvironmentVariables(QString value)
+{
+#ifdef Q_OS_WIN
+    const auto environment = QProcessEnvironment::systemEnvironment();
+    qsizetype searchFrom = 0;
+    while (true) {
+        const qsizetype start = value.indexOf(QLatin1Char('%'), searchFrom);
+        if (start < 0) {
+            break;
+        }
+
+        const qsizetype end = value.indexOf(QLatin1Char('%'), start + 1);
+        if (end < 0) {
+            break;
+        }
+
+        const QString name = value.mid(start + 1, end - start - 1);
+        const QString replacement = environment.value(name);
+        if (replacement.isEmpty()) {
+            searchFrom = end + 1;
+            continue;
+        }
+
+        value.replace(start, end - start + 1, replacement);
+        searchFrom = start + replacement.size();
+    }
+#endif
+    return value;
+}
+
+QUrl resolveConfiguredLocalUrl(const QString& rawValue)
+{
+    if (rawValue.isEmpty()) {
+        return {};
+    }
+
+    const QUrl url(rawValue);
+    if (url.isLocalFile()) {
+        return url;
+    }
+
+    const QString expanded = expandWindowsEnvironmentVariables(rawValue);
+    const QUrl expandedUrl(expanded);
+    if (expandedUrl.isLocalFile()) {
+        return expandedUrl;
+    }
+    if (QDir::isAbsolutePath(expanded)) {
+        return QUrl::fromLocalFile(QDir::cleanPath(expanded));
+    }
+
+    return QUrl(expanded);
+}
+}
 
 K_PLUGIN_FACTORY_WITH_JSON(KDevExecuteFactory, "kdevexecute.json", registerPlugin<ExecutePlugin>();)
 
@@ -120,7 +180,7 @@ QUrl ExecutePlugin::executable( KDevelop::ILaunchConfiguration* cfg, QString& er
     KConfigGroup grp = cfg->config();
     if( grp.readEntry(ExecutePlugin::isExecutableEntry, false ) )
     {
-        executable = grp.readEntry( ExecutePlugin::executableEntry, QUrl() );
+        executable = resolveConfiguredLocalUrl(grp.readEntry(ExecutePlugin::executableEntry, QString()));
     } else
     {
         QStringList prjitem = grp.readEntry( ExecutePlugin::projectTargetEntry, QStringList() );
@@ -202,7 +262,17 @@ QUrl ExecutePlugin::workingDirectory( KDevelop::ILaunchConfiguration* cfg ) cons
         return QUrl();
     }
 
-    return cfg->config().readEntry( ExecutePlugin::workingDirEntry, QUrl() );
+    const auto workingDir = cfg->config().readEntry(ExecutePlugin::workingDirEntry, QUrl());
+    if (workingDir.isEmpty()) {
+        return cfg->project() ? cfg->project()->path().toUrl() : QUrl();
+    }
+
+    if (workingDir.isLocalFile() || !workingDir.isRelative() || !cfg->project()) {
+        return workingDir;
+    }
+
+    const auto projectDir = cfg->project()->path().toLocalFile();
+    return QUrl::fromLocalFile(QDir(projectDir).absoluteFilePath(workingDir.toString()));
 }
 
 QStringList ExecutePlugin::defaultExternalTerminalCommands() const

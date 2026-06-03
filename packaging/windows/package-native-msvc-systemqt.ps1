@@ -4,6 +4,7 @@ param(
     [string]$QtDir = "C:\Qt\6.11.0\msvc2022_64",
     [string]$CraftRoot = "C:\CraftRoot",
     [string]$RiscvToolkitDir = "",
+    [string]$ThuCompilerDir = "",
     [string]$OutputRoot = "D:\tmp\kdevelop-native-installer",
     [string]$InstallerName = "RRISE-Setup.exe",
     [switch]$SkipWindeployQt,
@@ -137,6 +138,19 @@ function Copy-QtPluginType([string]$QtDir, [string]$DestBin, [string]$PluginType
     } | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destDir $_.Name) -Force
     }
+}
+
+function Update-ThuCompilerScripts([string]$ThuCompilerRoot) {
+    $compileBat = Join-Path $ThuCompilerRoot "compile.bat"
+    Require-Path $compileBat "THU compiler compile.bat"
+
+    $content = Get-Content -LiteralPath $compileBat -Raw
+    $replacement = @'
+set "compiler_path=%~dp0"
+for %%I in ("%compiler_path%.") do set "compiler_path=%%~fI"
+'@
+    $content = [regex]::Replace($content, 'set "compiler_path=[^"]*"', $replacement, 1)
+    Set-Content -LiteralPath $compileBat -Value $content -NoNewline -Encoding ASCII
 }
 
 function Copy-HicolorIconThemeIndex([string]$SourceBin, [string]$PayloadRoot) {
@@ -433,6 +447,9 @@ $systemQtKf6Bin = "C:\tmp\systemqt-kf6\bin"
 if (-not $RiscvToolkitDir) {
     $RiscvToolkitDir = Join-Path ([IO.Path]::GetFullPath((Join-Path $repoRoot ".."))) "riscv_toolkit"
 }
+if (-not $ThuCompilerDir) {
+    $ThuCompilerDir = Join-Path ([IO.Path]::GetFullPath((Join-Path $repoRoot ".."))) "thu-compiler"
+}
 
 Require-Path $InstallTree "KDevelop install tree"
 Require-Path (Join-Path $InstallTree "bin\kdevelop.exe") "kdevelop.exe"
@@ -441,6 +458,7 @@ Require-Path $qtBin "Qt bin directory"
 Require-Path $windeployqt "windeployqt.exe"
 Require-Path $craftBin "Craft bin directory"
 Require-Path $RiscvToolkitDir "RISC-V toolkit directory"
+Require-Path $ThuCompilerDir "THU compiler directory"
 Require-Path $cp210xZip "CP210x driver zip"
 Require-Path $logoSvg "RRISE logo"
 Require-Path $launcherSource "Launcher source"
@@ -483,6 +501,17 @@ Get-ChildItem -LiteralPath $toolkitPayload -Recurse -File | ForEach-Object {
         $_.IsReadOnly = $false
     }
 }
+
+Write-Host "Copying THU compiler..."
+$thuCompilerPayload = Join-Path $appPayload "thu-compiler"
+New-Item -ItemType Directory -Force -Path $thuCompilerPayload | Out-Null
+Copy-Item -Path (Join-Path $ThuCompilerDir "*") -Destination $thuCompilerPayload -Recurse -Force
+Get-ChildItem -LiteralPath $thuCompilerPayload -Recurse -File | ForEach-Object {
+    if ($_.IsReadOnly) {
+        $_.IsReadOnly = $false
+    }
+}
+Update-ThuCompilerScripts $thuCompilerPayload
 
 Write-Host "Copying RRISE logo..."
 $appPics = Join-Path $appPayload "pics"
