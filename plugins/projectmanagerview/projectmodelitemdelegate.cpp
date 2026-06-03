@@ -153,11 +153,7 @@ void ProjectModelItemDelegate::drawDisplay(QPainter* painter, const QStyleOption
     if (cg == QPalette::Normal && !(option.state & QStyle::State_Active)) {
         cg = QPalette::Inactive;
     }
-    if (option.state & QStyle::State_Selected) {
-        painter->setPen(option.palette.color(cg, QPalette::HighlightedText));
-    } else {
-        painter->setPen(option.palette.color(cg, QPalette::Text));
-    }
+    painter->setPen(option.palette.color(cg, QPalette::Text));
 
     QFontMetrics fm(painter->fontMetrics());
     painter->drawText(rect, fm.elidedText(text, Qt::ElideRight, rect.width()));

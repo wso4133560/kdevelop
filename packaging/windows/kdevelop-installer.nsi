@@ -41,6 +41,11 @@ Function KillDebugServerConsole
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DebugServerConsole.exe /T'
 FunctionEnd
 
+Function un.KillDebugServerConsole
+  DetailPrint "Stopping DebugServerConsole.exe if it is running..."
+  nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DebugServerConsole.exe /T'
+FunctionEnd
+
 Function .onInit
   Call KillDebugServerConsole
 FunctionEnd
@@ -84,6 +89,8 @@ Section /o "CP210x USB-to-UART driver" SEC_CP210X
 SectionEnd
 
 Section "Uninstall"
+  Call un.KillDebugServerConsole
+
   Delete "$DESKTOP\RRISE.lnk"
   Delete "$SMPROGRAMS\RRISE\RRISE.lnk"
   RMDir "$SMPROGRAMS\RRISE"

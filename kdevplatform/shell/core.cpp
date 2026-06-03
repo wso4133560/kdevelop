@@ -40,6 +40,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QUuid>
 
@@ -76,6 +77,15 @@ void installSignalHandler()
 #endif
 #ifdef SIGTERM
     std::signal(SIGTERM, shutdownGracefully);
+#endif
+}
+
+void stopDebugServerConsole()
+{
+#ifdef Q_OS_WIN
+    QProcess::execute(QStringLiteral("taskkill"),
+                      QStringList{QStringLiteral("/F"), QStringLiteral("/IM"),
+                                  QStringLiteral("DebugServerConsole.exe"), QStringLiteral("/T")});
 #endif
 }
 
@@ -423,6 +433,7 @@ void Core::cleanup()
 
     d->m_shuttingDown = true;
     emit aboutToShutdown();
+    stopDebugServerConsole();
 
     if (!d->m_cleanedUp) {
         // first of all: request stop of all background parser jobs
@@ -468,6 +479,7 @@ void Core::cleanup()
     }
 
     d->m_cleanedUp = true;
+    stopDebugServerConsole();
     emit shutdownCompleted();
 }
 

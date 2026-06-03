@@ -157,6 +157,7 @@ private Q_SLOTS:
     void documentSaved(KDevelop::IDocument*);
 
     void markContextMenuRequested(KTextEditor::Document* document, KTextEditor::Mark mark, QPoint pos, bool& handled);
+    void markClicked(KTextEditor::Document* document, KTextEditor::Mark mark, bool& handled);
 
 private:
     static const QPixmap* breakpointPixmap();

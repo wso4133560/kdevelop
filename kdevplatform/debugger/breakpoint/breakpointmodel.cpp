@@ -137,6 +137,7 @@ void BreakpointModel::textDocumentCreated(KDevelop::IDocument* doc)
     connect(textDocument, &KTextEditor::Document::markChanged, this, &BreakpointModel::markChanged);
     connect(textDocument, &KTextEditor::Document::markContextMenuRequested, this,
             &BreakpointModel::markContextMenuRequested);
+    connect(textDocument, &KTextEditor::Document::markClicked, this, &BreakpointModel::markClicked);
 
     connect(textDocument, &KTextEditor::Document::aboutToReload, this, &BreakpointModel::aboutToReload);
     connect(textDocument, &KTextEditor::Document::aboutToInvalidateMovingInterfaceContent, this,
@@ -412,6 +413,21 @@ void BreakpointModel::markContextMenuRequested(KTextEditor::Document* document, 
         } else if (triggeredAction == enableAction) {
             b->setData(Breakpoint::EnableColumn, b->enabled() ? Qt::Unchecked : Qt::Checked);
         }
+    }
+
+    handled = true;
+}
+
+void BreakpointModel::markClicked(KTextEditor::Document* document, Mark mark, bool& handled)
+{
+    if (!(document->editableMarks() & BreakpointMark) || document->url().isEmpty()) {
+        return;
+    }
+
+    if (Breakpoint* b = breakpoint(document->url(), mark.line)) {
+        removeBreakpoint(b);
+    } else {
+        addCodeBreakpoint(document->url(), mark.line);
     }
 
     handled = true;

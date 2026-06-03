@@ -459,49 +459,8 @@ QUrl ProjectDialogProvider::askProjectConfigLocation(bool fetch, const QUrl& sta
     bool writeProjectConfigToFile = true;
     if( projectFileExists( projectFileUrl ) )
     {
-        // check whether config is equal
-        bool shouldAsk = true;
-        if( projectFileUrl == dlg->selectedUrl() )
-        {
-            if( projectFileUrl.isLocalFile() )
-            {
-                shouldAsk = !equalProjectFile( projectFileUrl.toLocalFile(), dlg );
-            } else {
-                shouldAsk = false;
-
-                QTemporaryFile tmpFile;
-                if (tmpFile.open()) {
-                    auto downloadJob = KIO::file_copy(projectFileUrl, QUrl::fromLocalFile(tmpFile.fileName()));
-                    KJobWidgets::setWindow(downloadJob, qApp->activeWindow());
-                    if (downloadJob->exec()) {
-                        shouldAsk = !equalProjectFile(tmpFile.fileName(), dlg);
-                    }
-                }
-            }
-        }
-
-        if ( shouldAsk )
-        {
-            KGuiItem yes(i18nc("@action:button", "Override"));
-            yes.setToolTip(i18nc("@info:tooltip", "Continue to open the project and use the just provided project configuration"));
-            KGuiItem no(i18nc("@action:button", "Open Existing File"));
-            no.setToolTip(i18nc("@info:tooltip", "Continue to open the project but use the existing project configuration"));
-            KGuiItem cancel = KStandardGuiItem::cancel();
-            cancel.setToolTip(i18nc("@info:tooltip", "Cancel and do not open the project"));
-            int ret = KMessageBox::questionTwoActionsCancel(
-                qApp->activeWindow(),
-                i18n("There already exists a project configuration file at %1.\n"
-                     "Do you want to override it or open the existing file?",
-                     projectFileUrl.toDisplayString(QUrl::PreferLocalFile)),
-                i18nc("@title:window", "Override Existing Project Configuration"), yes, no, cancel);
-            if (ret == KMessageBox::SecondaryAction) {
-                writeProjectConfigToFile = false;
-            } else if (ret == KMessageBox::Cancel) {
-                return QUrl();
-            } // else fall through and write new file
-        } else {
-            writeProjectConfigToFile = false;
-        }
+        qCDebug(SHELL) << "using existing project configuration" << projectFileUrl;
+        writeProjectConfigToFile = false;
     }
 
     if (writeProjectConfigToFile) {
