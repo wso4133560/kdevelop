@@ -97,6 +97,7 @@ private Q_SLOTS:
 
 private:
     void loadCornerSettings();
+    void localizeTopLevelMenus();
 
 private:
     MainWindowPrivate* d_ptr;

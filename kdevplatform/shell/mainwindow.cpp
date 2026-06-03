@@ -17,6 +17,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QTimer>
 #include <QUrl>
 
 #include <KActionCollection>
@@ -75,12 +76,56 @@ QColor colorForDocument(const QUrl& url, const QPalette& palette, const QColor& 
     return WidgetColorizer::colorForId(qHash(project->path()), palette);
 }
 
+QString normalizedMenuTitle(QString title)
+{
+    title.remove(QLatin1Char('&'));
+    return title.trimmed();
+}
+
 }
 
 void MainWindow::createGUI(KParts::Part* part)
 {
     Sublime::MainWindow::setWindowTitleHandling(false);
     Sublime::MainWindow::createGUI(part);
+    localizeTopLevelMenus();
+    QTimer::singleShot(0, this, &MainWindow::localizeTopLevelMenus);
+}
+
+void MainWindow::localizeTopLevelMenus()
+{
+    static const QHash<QString, QString> menuTitles = {
+        {QStringLiteral("Session"), QStringLiteral("会话")},
+        {QStringLiteral("Project"), QStringLiteral("工程")},
+        {QStringLiteral("Run"), QStringLiteral("运行")},
+        {QStringLiteral("Navigation"), QStringLiteral("导航")},
+        {QStringLiteral("File"), QStringLiteral("文件")},
+        {QStringLiteral("Edit"), QStringLiteral("编辑")},
+        {QStringLiteral("View"), QStringLiteral("视图")},
+        {QStringLiteral("Selection"), QStringLiteral("选择")},
+        {QStringLiteral("Go"), QStringLiteral("转到")},
+        {QStringLiteral("Tools"), QStringLiteral("工具")},
+        {QStringLiteral("Code"), QStringLiteral("代码")},
+        {QStringLiteral("Window"), QStringLiteral("窗口")},
+        {QStringLiteral("Settings"), QStringLiteral("设置")},
+        {QStringLiteral("Help"), QStringLiteral("帮助")},
+    };
+
+    for (QAction* action : menuBar()->actions()) {
+        QMenu* const menu = action->menu();
+        if (!menu) {
+            continue;
+        }
+
+        const QString key = normalizedMenuTitle(action->text());
+        const auto titleIt = menuTitles.constFind(key);
+        if (titleIt == menuTitles.constEnd()) {
+            continue;
+        }
+
+        action->setText(*titleIt);
+        menu->setTitle(*titleIt);
+    }
 }
 
 void MainWindow::loadCornerSettings()
@@ -363,6 +408,9 @@ void MainWindow::initialize()
     // Therefore, auto-saving main window settings is useful only in case KDevelop crashes. Auto-saving correctly
     // might be possible, but perhaps not worth the likely significant implementation complexity increase.
     setupGUI(QSize{870, 650}, ToolBar);
+    connect(guiFactory(), &KXMLGUIFactory::clientAdded, this, [this] {
+        QTimer::singleShot(0, this, &MainWindow::localizeTopLevelMenus);
+    });
     createGUI(nullptr);
 
     Core::self()->partController()->addManagedTopLevelWidget(this);

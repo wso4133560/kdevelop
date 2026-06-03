@@ -1,4 +1,4 @@
-Unicode true
+﻿Unicode true
 
 !include "MUI2.nsh"
 !include "x64.nsh"
@@ -46,8 +46,22 @@ Function un.KillDebugServerConsole
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DebugServerConsole.exe /T'
 FunctionEnd
 
+Function un.CheckRRISEClosed
+  nsExec::ExecToStack '"$SYSDIR\cmd.exe" /C tasklist /FI "IMAGENAME eq KDevelop.exe" /NH | findstr /I /C:"KDevelop.exe" >NUL'
+  Pop $0
+  Pop $1
+  ${If} $0 == 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK "RRISE 正在运行。请先关闭 RRISE 后再卸载。"
+    Abort
+  ${EndIf}
+FunctionEnd
+
 Function .onInit
   Call KillDebugServerConsole
+FunctionEnd
+
+Function un.onInit
+  Call un.CheckRRISEClosed
 FunctionEnd
 
 Section "KDevelop application" SEC_APP
