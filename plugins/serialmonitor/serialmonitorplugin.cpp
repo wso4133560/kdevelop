@@ -16,6 +16,9 @@
 #include <QByteArray>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QList>
@@ -24,9 +27,12 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSet>
+#include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
+
+#include <memory>
 
 #include <qt_windows.h>
 #include <setupapi.h>
@@ -190,6 +196,7 @@ public:
         , m_openButton(new QPushButton(i18nc("@action:button", "Open"), this))
         , m_closeButton(new QPushButton(i18nc("@action:button", "Close"), this))
         , m_clearButton(new QPushButton(i18nc("@action:button", "Clear"), this))
+        , m_saveLogButton(new QPushButton(i18nc("@action:button", "Save Log..."), this))
         , m_statusLabel(new QLabel(this))
         , m_output(new QPlainTextEdit(this))
     {
@@ -212,6 +219,7 @@ public:
         controls->addWidget(m_openButton);
         controls->addWidget(m_closeButton);
         controls->addWidget(m_clearButton);
+        controls->addWidget(m_saveLogButton);
         controls->addWidget(m_statusLabel, 1);
 
         auto* layout = new QVBoxLayout(this);
@@ -221,7 +229,8 @@ public:
         connect(m_refreshButton, &QPushButton::clicked, this, &SerialMonitorView::refreshPorts);
         connect(m_openButton, &QPushButton::clicked, this, &SerialMonitorView::openPort);
         connect(m_closeButton, &QPushButton::clicked, this, &SerialMonitorView::closePort);
-        connect(m_clearButton, &QPushButton::clicked, m_output, &QPlainTextEdit::clear);
+        connect(m_clearButton, &QPushButton::clicked, this, &SerialMonitorView::clearOutput);
+        connect(m_saveLogButton, &QPushButton::clicked, this, &SerialMonitorView::chooseLogDirectory);
 
         s_views.push_back(this);
         readSettings();
@@ -380,6 +389,34 @@ private Q_SLOTS:
         }
     }
 
+    void chooseLogDirectory()
+    {
+        QString initialDirectory = s_logDirectory;
+        if (initialDirectory.isEmpty()) {
+            initialDirectory = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+        }
+        if (initialDirectory.isEmpty()) {
+            initialDirectory = QDir::homePath();
+        }
+
+        const QString directory = QFileDialog::getExistingDirectory(this,
+                                                                    i18nc("@title:window", "Select Serial Log Folder"),
+                                                                    initialDirectory);
+        if (directory.isEmpty()) {
+            return;
+        }
+
+        startSavingLog(directory);
+    }
+
+    void clearOutput()
+    {
+        s_output.clear();
+        for (SerialMonitorView* view : std::as_const(s_views)) {
+            view->m_output->clear();
+        }
+    }
+
 private:
     static QList<SerialPortInfo> availablePorts()
     {
@@ -525,6 +562,8 @@ private:
             s_output.remove(0, s_output.size() - 200000);
         }
 
+        writeLogFile(text);
+
         for (SerialMonitorView* view : std::as_const(s_views)) {
             view->m_output->moveCursor(QTextCursor::End);
             view->m_output->insertPlainText(text);
@@ -547,12 +586,68 @@ private:
         }
     }
 
+    static void writeLogFile(const QString& text)
+    {
+        if (!s_logFile || !s_logFile->isOpen()) {
+            return;
+        }
+
+        s_logFile->write(text.toUtf8());
+        s_logFile->flush();
+    }
+
+    static void updateViewsLogState()
+    {
+        for (SerialMonitorView* view : std::as_const(s_views)) {
+            view->updateLogUi();
+        }
+    }
+
+    void startSavingLog(const QString& directory)
+    {
+        QDir dir(directory);
+        if (!dir.exists()) {
+            setStatus(i18n("Log folder does not exist: %1", directory));
+            return;
+        }
+
+        const QString fileName = QStringLiteral("serial-port-%1.log")
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+        const QString filePath = dir.filePath(fileName);
+
+        auto logFile = std::make_unique<QFile>(filePath);
+        if (!logFile->open(QIODevice::WriteOnly | QIODevice::Text)) {
+            setStatus(i18n("Failed to open log file: %1", logFile->errorString()));
+            return;
+        }
+
+        if (!s_output.isEmpty()) {
+            logFile->write(s_output.toUtf8());
+            logFile->flush();
+        }
+
+        s_logDirectory = dir.absolutePath();
+        s_logFilePath = filePath;
+        s_logFile = std::move(logFile);
+
+        KConfigGroup config(KSharedConfig::openConfig(), QStringLiteral("SerialMonitor"));
+        config.writeEntry("LogDirectory", s_logDirectory);
+        config.sync();
+
+        appendLog(i18n("[%1] Saving serial log to %2\n",
+                       QDateTime::currentDateTime().toString(Qt::ISODateWithMs),
+                       QDir::toNativeSeparators(s_logFilePath)));
+        setStatus(i18n("Saving log: %1", QDir::toNativeSeparators(s_logFilePath)));
+        updateViewsLogState();
+    }
+
     void syncFromSharedState()
     {
         m_output->setPlainText(s_output);
         m_output->moveCursor(QTextCursor::End);
         m_statusLabel->setText(s_status);
         updateUi(s_portOpen || s_opening);
+        updateLogUi();
     }
 
     void updateUi(bool open)
@@ -564,11 +659,26 @@ private:
         m_closeButton->setEnabled(open);
     }
 
+    void updateLogUi()
+    {
+        if (s_logFile && s_logFile->isOpen()) {
+            m_saveLogButton->setText(i18nc("@action:button", "Change Log Folder..."));
+            m_saveLogButton->setToolTip(i18n("Serial output is being saved to: %1",
+                                             QDir::toNativeSeparators(s_logFilePath)));
+        } else {
+            m_saveLogButton->setText(i18nc("@action:button", "Save Log..."));
+            m_saveLogButton->setToolTip(i18n("Select a folder and save current and future serial output to a log file."));
+        }
+    }
+
     void readSettings()
     {
         const KConfigGroup config(KSharedConfig::openConfig(), QStringLiteral("SerialMonitor"));
         const QString port = config.readEntry("Port", QString());
         const int baud = config.readEntry("BaudRate", 115200);
+        if (s_logDirectory.isEmpty()) {
+            s_logDirectory = config.readEntry("LogDirectory", QString());
+        }
         if (!port.isEmpty()) {
             m_portCombo->setEditText(port);
         }
@@ -594,6 +704,7 @@ private:
     QPushButton* const m_openButton;
     QPushButton* const m_closeButton;
     QPushButton* const m_clearButton;
+    QPushButton* const m_saveLogButton;
     QLabel* const m_statusLabel;
     QPlainTextEdit* const m_output;
 
@@ -604,6 +715,9 @@ private:
     static quint64 s_totalBytes;
     static QString s_output;
     static QString s_status;
+    static QString s_logDirectory;
+    static QString s_logFilePath;
+    static std::unique_ptr<QFile> s_logFile;
 };
 
 QList<SerialMonitorView*> SerialMonitorView::s_views;
@@ -613,6 +727,9 @@ bool SerialMonitorView::s_portOpen = false;
 quint64 SerialMonitorView::s_totalBytes = 0;
 QString SerialMonitorView::s_output;
 QString SerialMonitorView::s_status;
+QString SerialMonitorView::s_logDirectory;
+QString SerialMonitorView::s_logFilePath;
+std::unique_ptr<QFile> SerialMonitorView::s_logFile;
 
 class SerialMonitorPlugin : public KDevelop::IPlugin
 {
