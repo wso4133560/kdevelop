@@ -27,6 +27,7 @@ class IDebugSession;
 
 namespace KDevMI {
 class IToolViewFactoryHolder;
+struct InferiorStartupInfo;
 class MIAttachProcessJob;
 class MIDebugSession;
 class DBusProxy;
@@ -44,6 +45,9 @@ public:
     void unload() override;
 
     MIDebugSession* createSession();
+    MIDebugSession* createUnregisteredSession();
+    void registerSession(MIDebugSession* session);
+    virtual bool prepareDebugging(const InferiorStartupInfo& startupInfo);
 
 //BEGIN IStatus
 public:

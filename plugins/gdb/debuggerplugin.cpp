@@ -94,6 +94,11 @@ void CppDebuggerPlugin::setupExecutePlugin(KDevelop::IPlugin* plugin, bool load)
 
 CppDebuggerPlugin::~CppDebuggerPlugin() = default;
 
+bool CppDebuggerPlugin::prepareDebugging(const InferiorStartupInfo& startupInfo)
+{
+    return DebugSession::prepareRemoteDebugging(startupInfo);
+}
+
 KDevMI::MIDebugSession* CppDebuggerPlugin::createSessionObject()
 {
     return new DebugSession();

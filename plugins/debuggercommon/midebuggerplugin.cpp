@@ -206,8 +206,21 @@ void MIDebuggerPlugin::slotDebugExternalProcess(DBusProxy* proxy)
 
 MIDebugSession* MIDebuggerPlugin::createSession()
 {
+    auto* const session = createUnregisteredSession();
+    registerSession(session);
+    return session;
+}
+
+MIDebugSession* MIDebuggerPlugin::createUnregisteredSession()
+{
+    return createSessionObject();
+}
+
+void MIDebuggerPlugin::registerSession(MIDebugSession* session)
+{
+    Q_ASSERT(session);
+
     auto* const debugController = core()->debugController();
-    auto* const session = createSessionObject();
 
     // Our tool views are registered only while a debug session created by this plugin is the current session of
     // DebugController. This way, for example, only LLDB (and not GDB) tool views are present during an LLDB session.
@@ -225,7 +238,12 @@ MIDebugSession* MIDebuggerPlugin::createSession()
 
     connect(session, &MIDebugSession::showMessage, this, &MIDebuggerPlugin::showStatusMessage);
     connect(session, &MIDebugSession::raiseDebuggerConsoleViews, this, &MIDebuggerPlugin::raiseDebuggerConsoleViews);
-    return session;
+}
+
+bool MIDebuggerPlugin::prepareDebugging(const InferiorStartupInfo& startupInfo)
+{
+    Q_UNUSED(startupInfo);
+    return true;
 }
 
 void MIDebuggerPlugin::slotExamineCore()

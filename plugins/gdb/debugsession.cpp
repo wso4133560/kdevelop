@@ -27,14 +27,18 @@
 #include <interfaces/idebugcontroller.h>
 #include <interfaces/ilaunchconfiguration.h>
 #include <interfaces/iproject.h>
+#include <interfaces/iuicontroller.h>
 #include <util/environmentprofilelist.h>
 #include <util/path.h>
 
 #include <KConfigGroup>
 #include <KLocalizedString>
+#include <KMessageBox>
+#include <KParts/MainWindow>
 #include <KShell>
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QProcess>
 #include <QStandardPaths>
@@ -47,6 +51,9 @@ using namespace KDevMI::MI;
 using namespace KDevelop;
 
 namespace {
+constexpr int debugServerPort = 39000;
+QProcess* preflightDebugServerProcess = nullptr;
+
 QString resolveLaunchLocalPath(const QUrl& url, KDevelop::ILaunchConfiguration* cfg, IExecutePlugin* iexec)
 {
     if (url.isEmpty()) {
@@ -72,6 +79,34 @@ QString resolveLaunchLocalPath(const QUrl& url, KDevelop::ILaunchConfiguration* 
 
     return QDir(baseDir).absoluteFilePath(path);
 }
+
+bool isDebugServerListening()
+{
+#ifdef Q_OS_WIN
+    QProcess netstat;
+    netstat.start(QStringLiteral("cmd.exe"),
+                  {QStringLiteral("/c"),
+                   QStringLiteral("netstat -ano | findstr /R /C:\":%1 .*LISTENING\" >nul").arg(debugServerPort)});
+    if (!netstat.waitForFinished(3000)) {
+        netstat.kill();
+        netstat.waitForFinished();
+        return false;
+    }
+    return netstat.exitStatus() == QProcess::NormalExit && netstat.exitCode() == 0;
+#else
+    return false;
+#endif
+}
+
+void showBoardNotConnectedDialog()
+{
+    KMessageBox::error(
+        KDevelop::ICore::self()->uiController()->activeMainWindow(),
+        QStringLiteral("\u672a\u68c0\u6d4b\u5230\u8c03\u8bd5\u677f\u5361\u8fde\u63a5\u3002"
+                       "\u8bf7\u786e\u8ba4 CKLink/\u677f\u5361\u5df2\u8fde\u63a5\u5e76\u4e0a\u7535\u540e\u518d\u70b9\u51fb\u8c03\u8bd5\u3002"),
+        QStringLiteral("\u8c03\u8bd5\u677f\u5361\u672a\u8fde\u63a5"));
+}
+
 }
 
 DebugSession::DebugSession()
@@ -81,7 +116,19 @@ DebugSession::DebugSession()
     m_frameStackModel = new GdbFrameStackModel(this);
 }
 
-DebugSession::~DebugSession() = default;
+DebugSession::~DebugSession()
+{
+    if (m_debugServerProcess) {
+        if (m_debugServerProcess->state() != QProcess::NotRunning) {
+            m_debugServerProcess->terminate();
+            if (!m_debugServerProcess->waitForFinished(1000)) {
+                m_debugServerProcess->kill();
+                m_debugServerProcess->waitForFinished();
+            }
+        }
+        m_debugServerProcess = nullptr;
+    }
+}
 
 void DebugSession::setAutoDisableASLR(bool enable)
 {
@@ -146,6 +193,83 @@ void DebugSession::initializeDebugger()
                QStringLiteral("disable-randomization %1").arg(m_autoDisableASLR ? QLatin1String("on") : QLatin1String("off")));
 
     qCDebug(DEBUGGERGDB) << "Initialized GDB";
+}
+
+bool DebugSession::prepareDebugging(const InferiorStartupInfo& startupInfo)
+{
+    return prepareRemoteDebugging(startupInfo);
+}
+
+bool DebugSession::prepareRemoteDebugging(const InferiorStartupInfo& startupInfo)
+{
+    auto* const cfg = startupInfo.launchConfiguration;
+    auto* const iexec = startupInfo.execute;
+    Q_ASSERT(cfg);
+    Q_ASSERT(iexec);
+
+    const QUrl configGdbScriptUrl = cfg->config().readEntry(Config::RemoteGdbConfigEntry, QUrl());
+    const QString configGdbScript = resolveLaunchLocalPath(configGdbScriptUrl, cfg, iexec);
+    if (configGdbScript.isEmpty()) {
+        return true;
+    }
+
+    const QFileInfo configScriptInfo(configGdbScript);
+    const QString debugServerScript = configScriptInfo.dir().filePath(QStringLiteral("start_ck803_debugserver_39000.cmd"));
+    if (!QFileInfo::exists(debugServerScript)) {
+        return true;
+    }
+
+    if (isDebugServerListening()) {
+        return true;
+    }
+
+    if (preflightDebugServerProcess && preflightDebugServerProcess->state() != QProcess::NotRunning) {
+        preflightDebugServerProcess->kill();
+        preflightDebugServerProcess->waitForFinished();
+    }
+    delete preflightDebugServerProcess;
+    preflightDebugServerProcess = new QProcess;
+    preflightDebugServerProcess->setProcessChannelMode(QProcess::MergedChannels);
+    preflightDebugServerProcess->setWorkingDirectory(configScriptInfo.dir().absolutePath());
+    preflightDebugServerProcess->start(QStringLiteral("cmd.exe"),
+                                       {QStringLiteral("/c"), QStringLiteral("call"),
+                                        QDir::toNativeSeparators(debugServerScript)});
+    if (!preflightDebugServerProcess->waitForStarted(3000)) {
+        qCWarning(DEBUGGERGDB) << "failed to start CK803 debug server script" << debugServerScript
+                               << preflightDebugServerProcess->errorString();
+        showBoardNotConnectedDialog();
+        delete preflightDebugServerProcess;
+        preflightDebugServerProcess = nullptr;
+        return false;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 8000) {
+        if (isDebugServerListening()) {
+            qCDebug(DEBUGGERGDB) << "CK803 debug server is listening on port" << debugServerPort;
+            return true;
+        }
+        if (preflightDebugServerProcess->waitForFinished(250)) {
+            break;
+        }
+    }
+
+    const QString debugServerOutput =
+        QString::fromLocal8Bit(preflightDebugServerProcess->readAll()).trimmed();
+    if (!debugServerOutput.isEmpty()) {
+        qCWarning(DEBUGGERGDB) << "CK803 debug server failed:" << debugServerOutput;
+    }
+
+    if (preflightDebugServerProcess->state() != QProcess::NotRunning) {
+        preflightDebugServerProcess->kill();
+        preflightDebugServerProcess->waitForFinished();
+    }
+    delete preflightDebugServerProcess;
+    preflightDebugServerProcess = nullptr;
+
+    showBoardNotConnectedDialog();
+    return false;
 }
 
 void DebugSession::configInferior(ILaunchConfiguration *cfg, IExecutePlugin *iexec, const QString &)
@@ -221,11 +345,15 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
         const QFileInfo configScriptInfo(configGdbScript);
         const QString debugServerScript = configScriptInfo.dir().filePath(QStringLiteral("start_ck803_debugserver_39000.cmd"));
         if (QFileInfo::exists(debugServerScript)) {
-            qCDebug(DEBUGGERGDB) << "starting CK803 debug server" << debugServerScript;
-            QProcess::startDetached(QStringLiteral("cmd.exe"),
-                                    {QStringLiteral("/c"), QStringLiteral("call"), QDir::toNativeSeparators(debugServerScript)},
-                                    configScriptInfo.dir().absolutePath());
-            QThread::msleep(1500);
+            if (!isDebugServerListening()) {
+                qCDebug(DEBUGGERGDB) << "starting CK803 debug server" << debugServerScript;
+                QProcess::startDetached(QStringLiteral("cmd.exe"),
+                                        {QStringLiteral("/c"), QStringLiteral("call"), QDir::toNativeSeparators(debugServerScript)},
+                                        configScriptInfo.dir().absolutePath());
+                QThread::msleep(1500);
+            } else {
+                qCDebug(DEBUGGERGDB) << "CK803 debug server is already listening on port" << debugServerPort;
+            }
         }
         addCommand(MI::NonMI, QLatin1String("source ") + configGdbScript);
     }

@@ -49,19 +49,13 @@ bool usesRemoteGdbScripts(const KConfigGroup& grp)
 template<class JobBase>
 MIDebugJobBase<JobBase>::MIDebugJobBase(MIDebuggerPlugin* plugin, QObject* parent)
     : JobBase(parent)
+    , m_plugin(plugin)
 {
     Q_ASSERT(plugin);
 
     JobBase::setCapabilities(KJob::Killable);
 
-    m_session = plugin->createSession();
-    QObject::connect(m_session, &MIDebugSession::stateChanged, this, [this](IDebugSession::DebuggerState state) {
-        if (state == IDebugSession::EndedState) {
-            done();
-        }
-    });
-
-    qCDebug(DEBUGGERCOMMON) << "created debug job" << this << "with" << m_session;
+    qCDebug(DEBUGGERCOMMON) << "created debug job" << this;
 }
 
 template<class JobBase>
@@ -72,7 +66,9 @@ MIDebugJobBase<JobBase>::~MIDebugJobBase()
         qCDebug(DEBUGGERCOMMON) << "destroying debug job" << this;
     } else {
         qCDebug(DEBUGGERCOMMON) << "destroying debug job" << this << "before it finished";
-        stopDebugger();
+        if (m_session) {
+            stopDebugger();
+        }
     }
 }
 
@@ -84,8 +80,31 @@ void MIDebugJobBase<JobBase>::done()
 }
 
 template<typename JobBase>
+MIDebugSession* MIDebugJobBase<JobBase>::createAndRegisterSession()
+{
+    auto* const session = m_plugin->createSession();
+    trackSession(session);
+    return session;
+}
+
+template<typename JobBase>
+void MIDebugJobBase<JobBase>::trackSession(MIDebugSession* session)
+{
+    Q_ASSERT(session);
+    Q_ASSERT(!m_session);
+
+    m_session = session;
+    QObject::connect(m_session, &MIDebugSession::stateChanged, this, [this](IDebugSession::DebuggerState state) {
+        if (state == IDebugSession::EndedState) {
+            done();
+        }
+    });
+}
+
+template<typename JobBase>
 void MIDebugJobBase<JobBase>::stopDebugger()
 {
+    Q_ASSERT(m_session);
     qCDebug(DEBUGGERCOMMON) << "stopping debugger of" << m_session;
     QObject::disconnect(m_session, &MIDebugSession::stateChanged, this, nullptr);
     m_session->stopDebugger();
@@ -95,7 +114,9 @@ template<typename JobBase>
 bool MIDebugJobBase<JobBase>::doKill()
 {
     qCDebug(DEBUGGERCOMMON) << "killing debug job" << this;
-    stopDebugger();
+    if (m_session) {
+        stopDebugger();
+    }
     return true;
 }
 
@@ -109,15 +130,10 @@ MIDebugJob::MIDebugJob(MIDebuggerPlugin* p, ILaunchConfiguration* launchcfg,
     initializeStartupInfo(execute, launchcfg);
     if (!m_startupInfo) {
         qCDebug(DEBUGGERCOMMON) << "failing debug job" << this;
-        stopDebugger();
         // The dependency job, if any, will not be created, and an output view
         // for this job will never be added, so do not raise any tool view.
         return;
     }
-
-    // This job may have a dependency builder job. If the dependency job fails, this debug job is destroyed
-    // instead of being started. Raise the Build output tool view to show build error(s) in this scenario.
-    m_session->setToolViewToRaiseAtEnd(IDebugSession::ToolView::Build);
 
     const auto launchName = displayLaunchName(launchcfg->name());
     if (launchcfg->project()) {
@@ -136,6 +152,17 @@ void MIDebugJob::start()
         return;
     }
     Q_ASSERT(error() == NoError);
+
+    if (!m_plugin->prepareDebugging(*m_startupInfo)) {
+        m_startupInfo.reset();
+        done();
+        return;
+    }
+    createAndRegisterSession();
+
+    // This job may have a dependency builder job. If the dependency job fails after
+    // the debug session is registered, raise the Build output tool view to show build error(s).
+    m_session->setToolViewToRaiseAtEnd(IDebugSession::ToolView::Build);
 
     setStandardToolView(IOutputView::DebugView);
     setBehaviours(IOutputView::Behaviours(IOutputView::AllowUserClose) | KDevelop::IOutputView::AutoScroll);
@@ -224,6 +251,7 @@ MIExamineCoreJob::MIExamineCoreJob(MIDebuggerPlugin* plugin, CoreInfo coreInfo, 
 
 void MIExamineCoreJob::start()
 {
+    createAndRegisterSession();
     if (!m_session->examineCoreFile(std::move(m_coreInfo.executableFile), std::move(m_coreInfo.coreFile))) {
         done();
     }
@@ -240,6 +268,7 @@ MIAttachProcessJob::MIAttachProcessJob(MIDebuggerPlugin *plugin, int pid, QObjec
 
 void MIAttachProcessJob::start()
 {
+    createAndRegisterSession();
     if (!m_session->attachToProcess(m_pid)) {
         done();
     }

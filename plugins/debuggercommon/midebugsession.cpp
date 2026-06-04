@@ -267,6 +267,12 @@ bool MIDebugSession::startDebugging(ILaunchConfiguration* cfg, IExecutePlugin* i
     return startDebugging({iexec, cfg, std::move(executablePath), std::move(arguments), std::move(terminal)});
 }
 
+bool MIDebugSession::prepareDebugging(const InferiorStartupInfo& startupInfo)
+{
+    Q_UNUSED(startupInfo);
+    return true;
+}
+
 bool MIDebugSession::startDebugging(const InferiorStartupInfo& startupInfo)
 {
     auto* const iexec = startupInfo.execute;

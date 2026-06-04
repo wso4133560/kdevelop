@@ -29,6 +29,7 @@ public:
 private:
     void setupExecutePlugin(KDevelop::IPlugin* plugin, bool load);
 
+    bool prepareDebugging(const InferiorStartupInfo& startupInfo) override;
     [[nodiscard]] MIDebugSession* createSessionObject() override;
     [[nodiscard]] ToolViewFactoryHolderPtr createToolViewFactoryHolder() override;
 

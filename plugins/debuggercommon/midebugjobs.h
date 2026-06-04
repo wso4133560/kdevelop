@@ -53,7 +53,11 @@ protected:
 
     bool doKill() override;
 
-    MIDebugSession* m_session;
+    MIDebugSession* createAndRegisterSession();
+    void trackSession(MIDebugSession* session);
+
+    MIDebuggerPlugin* const m_plugin;
+    MIDebugSession* m_session = nullptr;
 };
 
 class MIDebugJob : public MIDebugJobBase<KDevelop::OutputJob>

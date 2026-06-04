@@ -112,6 +112,13 @@ public:
     bool startDebugging(const InferiorStartupInfo& startupInfo);
 
     /**
+     * Perform debugger-specific checks before the UI switches into a debug run.
+     *
+     * @return whether debugging may proceed
+     */
+    virtual bool prepareDebugging(const InferiorStartupInfo& startupInfo);
+
+    /**
      * @return whether a command can be added to this session
      *
      * @note The session object itself may add certain commands (e.g. commands needed

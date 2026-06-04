@@ -20,6 +20,7 @@
 #include "mi/mi.h"
 
 class IExecutePlugin;
+class QProcess;
 
 namespace KDevelop {
 class ILaunchConfiguration;
@@ -35,6 +36,8 @@ public:
     explicit DebugSession();
     ~DebugSession() override;
 
+    static bool prepareRemoteDebugging(const InferiorStartupInfo& startupInfo);
+
     BreakpointController * breakpointController() const override;
     VariableController * variableController() const override;
     GdbFrameStackModel * frameStackModel() const override;
@@ -47,6 +50,8 @@ public:
 protected:
     GdbDebugger *createDebugger() const override;
     void initializeDebugger() override;
+
+    bool prepareDebugging(const InferiorStartupInfo& startupInfo) override;
 
     void configInferior(KDevelop::ILaunchConfiguration* cfg, IExecutePlugin* iexec, const QString&) override;
 
@@ -62,6 +67,7 @@ private:
     BreakpointController *m_breakpointController = nullptr;
     VariableController *m_variableController = nullptr;
     GdbFrameStackModel *m_frameStackModel = nullptr;
+    QProcess* m_debugServerProcess = nullptr;
 
     bool m_autoDisableASLR = false;
 };
