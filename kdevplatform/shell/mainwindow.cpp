@@ -79,22 +79,17 @@ QColor colorForDocument(const QUrl& url, const QPalette& palette, const QColor& 
 QString normalizedMenuTitle(QString title)
 {
     title.remove(QLatin1Char('&'));
+    const int tabIndex = title.indexOf(QLatin1Char('\t'));
+    if (tabIndex >= 0) {
+        title.truncate(tabIndex);
+    }
+    title.replace(QChar(0x2026), QStringLiteral("..."));
     return title.trimmed();
 }
 
-}
-
-void MainWindow::createGUI(KParts::Part* part)
+const QHash<QString, QString>& menuTitleTranslations()
 {
-    Sublime::MainWindow::setWindowTitleHandling(false);
-    Sublime::MainWindow::createGUI(part);
-    localizeTopLevelMenus();
-    QTimer::singleShot(0, this, &MainWindow::localizeTopLevelMenus);
-}
-
-void MainWindow::localizeTopLevelMenus()
-{
-    static const QHash<QString, QString> menuTitles = {
+    static const QHash<QString, QString> translations = {
         {QStringLiteral("Session"), QStringLiteral("会话")},
         {QStringLiteral("Project"), QStringLiteral("工程")},
         {QStringLiteral("Run"), QStringLiteral("运行")},
@@ -109,8 +104,395 @@ void MainWindow::localizeTopLevelMenus()
         {QStringLiteral("Window"), QStringLiteral("窗口")},
         {QStringLiteral("Settings"), QStringLiteral("设置")},
         {QStringLiteral("Help"), QStringLiteral("帮助")},
+        {QStringLiteral("Bookmarks"), QStringLiteral("书签")},
+        {QStringLiteral("Spelling"), QStringLiteral("拼写检查")},
+        {QStringLiteral("Mode"), QStringLiteral("模式")},
+        {QStringLiteral("Scripts"), QStringLiteral("脚本")},
+        {QStringLiteral("Highlighting"), QStringLiteral("语法高亮")},
+        {QStringLiteral("Indentation"), QStringLiteral("缩进")},
+        {QStringLiteral("End of Line"), QStringLiteral("行尾格式")},
+        {QStringLiteral("Folding"), QStringLiteral("代码折叠")},
+        {QStringLiteral("Word Wrap"), QStringLiteral("自动换行")},
+        {QStringLiteral("View Mode"), QStringLiteral("视图模式")},
+        {QStringLiteral("Color Scheme"), QStringLiteral("配色方案")},
+        {QStringLiteral("Examine Core File"), QStringLiteral("检查 Core 文件")},
+        {QStringLiteral("Attach to Process"), QStringLiteral("附加到进程")},
+        {QStringLiteral("Analyze Current File With"), QStringLiteral("使用以下工具分析当前文件")},
+        {QStringLiteral("Analyze Current Project With"), QStringLiteral("使用以下工具分析当前工程")},
     };
+    return translations;
+}
 
+const QHash<QString, QString>& actionTextTranslations()
+{
+    static const QHash<QString, QString> translations = {
+        {QStringLiteral("New"), QStringLiteral("新建")},
+        {QStringLiteral("New..."), QStringLiteral("新建...")},
+        {QStringLiteral("New File"), QStringLiteral("新建文件")},
+        {QStringLiteral("New File..."), QStringLiteral("新建文件...")},
+        {QStringLiteral("New from Template..."), QStringLiteral("从模板新建...")},
+        {QStringLiteral("Open..."), QStringLiteral("打开...")},
+        {QStringLiteral("Open / Import Project..."), QStringLiteral("打开/导入工程...")},
+        {QStringLiteral("Open Recent"), QStringLiteral("打开最近使用")},
+        {QStringLiteral("Open Recent Project"), QStringLiteral("打开最近工程")},
+        {QStringLiteral("Open Project for Current File"), QStringLiteral("打开当前文件所属工程")},
+        {QStringLiteral("Open Configuration..."), QStringLiteral("打开配置...")},
+        {QStringLiteral("Fetch Project..."), QStringLiteral("获取工程...")},
+        {QStringLiteral("Close"), QStringLiteral("关闭")},
+        {QStringLiteral("Close All"), QStringLiteral("全部关闭")},
+        {QStringLiteral("Close All Other"), QStringLiteral("关闭其他")},
+        {QStringLiteral("Close All Others"), QStringLiteral("关闭其他")},
+        {QStringLiteral("Close Project(s)"), QStringLiteral("关闭工程")},
+        {QStringLiteral("Quit"), QStringLiteral("退出")},
+        {QStringLiteral("Save"), QStringLiteral("保存")},
+        {QStringLiteral("Save As..."), QStringLiteral("另存为...")},
+        {QStringLiteral("Save All"), QStringLiteral("全部保存")},
+        {QStringLiteral("Reload"), QStringLiteral("重新加载")},
+        {QStringLiteral("Reload All"), QStringLiteral("全部重新加载")},
+        {QStringLiteral("Print..."), QStringLiteral("打印...")},
+        {QStringLiteral("Print Preview"), QStringLiteral("打印预览")},
+        {QStringLiteral("Undo"), QStringLiteral("撤销")},
+        {QStringLiteral("Redo"), QStringLiteral("重做")},
+        {QStringLiteral("Cut"), QStringLiteral("剪切")},
+        {QStringLiteral("Copy"), QStringLiteral("复制")},
+        {QStringLiteral("Copy All"), QStringLiteral("全部复制")},
+        {QStringLiteral("Copy Filename"), QStringLiteral("复制文件名")},
+        {QStringLiteral("Paste"), QStringLiteral("粘贴")},
+        {QStringLiteral("Select All"), QStringLiteral("全选")},
+        {QStringLiteral("Deselect"), QStringLiteral("取消选择")},
+        {QStringLiteral("Select to Matching Bracket"), QStringLiteral("选择到匹配括号")},
+        {QStringLiteral("Toggle Block Selection"), QStringLiteral("切换块选择")},
+        {QStringLiteral("Find..."), QStringLiteral("查找...")},
+        {QStringLiteral("Find Next"), QStringLiteral("查找下一个")},
+        {QStringLiteral("Find Previous"), QStringLiteral("查找上一个")},
+        {QStringLiteral("Replace..."), QStringLiteral("替换...")},
+        {QStringLiteral("Find/Replace in Files..."), QStringLiteral("在文件中查找/替换...")},
+        {QStringLiteral("Insert Tab"), QStringLiteral("插入制表符")},
+        {QStringLiteral("Delete Line"), QStringLiteral("删除当前行")},
+        {QStringLiteral("Delete Word Left"), QStringLiteral("删除左侧单词")},
+        {QStringLiteral("Delete Word Right"), QStringLiteral("删除右侧单词")},
+        {QStringLiteral("Transpose Characters"), QStringLiteral("交换字符")},
+        {QStringLiteral("Move Lines Up"), QStringLiteral("上移行")},
+        {QStringLiteral("Move Lines Down"), QStringLiteral("下移行")},
+        {QStringLiteral("Copy Lines Up"), QStringLiteral("向上复制行")},
+        {QStringLiteral("Copy Lines Down"), QStringLiteral("向下复制行")},
+        {QStringLiteral("Duplicate Selected Lines"), QStringLiteral("复制选中行")},
+        {QStringLiteral("Join Lines"), QStringLiteral("合并行")},
+        {QStringLiteral("Uppercase"), QStringLiteral("转换为大写")},
+        {QStringLiteral("Lowercase"), QStringLiteral("转换为小写")},
+        {QStringLiteral("Capitalize"), QStringLiteral("首字母大写")},
+        {QStringLiteral("Comment"), QStringLiteral("注释")},
+        {QStringLiteral("Uncomment"), QStringLiteral("取消注释")},
+        {QStringLiteral("Go to Line..."), QStringLiteral("转到行...")},
+        {QStringLiteral("Back"), QStringLiteral("后退")},
+        {QStringLiteral("Forward"), QStringLiteral("前进")},
+        {QStringLiteral("Last Edit Location"), QStringLiteral("上次编辑位置")},
+        {QStringLiteral("Jump to Declaration"), QStringLiteral("跳转到声明")},
+        {QStringLiteral("Jump to Definition"), QStringLiteral("跳转到定义")},
+        {QStringLiteral("Jump to Next Outputmark"), QStringLiteral("跳转到下一个输出标记")},
+        {QStringLiteral("Jump to Previous Outputmark"), QStringLiteral("跳转到上一个输出标记")},
+        {QStringLiteral("Source Browse Mode"), QStringLiteral("源码浏览模式")},
+        {QStringLiteral("Previous Visited Context"), QStringLiteral("上一个访问上下文")},
+        {QStringLiteral("Next Visited Context"), QStringLiteral("下一个访问上下文")},
+        {QStringLiteral("Previous Use"), QStringLiteral("上一个使用位置")},
+        {QStringLiteral("Next Use"), QStringLiteral("下一个使用位置")},
+        {QStringLiteral("Next Function"), QStringLiteral("下一个函数")},
+        {QStringLiteral("Previous Function"), QStringLiteral("上一个函数")},
+        {QStringLiteral("Outline"), QStringLiteral("大纲")},
+        {QStringLiteral("Quick Open"), QStringLiteral("快速打开")},
+        {QStringLiteral("Quick Open File"), QStringLiteral("快速打开文件")},
+        {QStringLiteral("Quick Open Class"), QStringLiteral("快速打开类")},
+        {QStringLiteral("Quick Open Function"), QStringLiteral("快速打开函数")},
+        {QStringLiteral("Quick Open Already Open File"), QStringLiteral("快速打开已打开文件")},
+        {QStringLiteral("Quick Open Documentation"), QStringLiteral("快速打开文档")},
+        {QStringLiteral("Quick Open Actions"), QStringLiteral("快速打开动作")},
+        {QStringLiteral("Embedded Quick Open"), QStringLiteral("嵌入式快速打开")},
+        {QStringLiteral("Context Browser"), QStringLiteral("上下文浏览器")},
+        {QStringLiteral("Document Declaration"), QStringLiteral("生成文档声明")},
+        {QStringLiteral("Show Documentation"), QStringLiteral("显示文档")},
+        {QStringLiteral("Reformat Source"), QStringLiteral("重新格式化源码")},
+        {QStringLiteral("Reformat Line"), QStringLiteral("重新格式化当前行")},
+        {QStringLiteral("Reformat Files..."), QStringLiteral("重新格式化文件...")},
+        {QStringLiteral("Configure Launches..."), QStringLiteral("配置启动项...")},
+        {QStringLiteral("Execute Launch"), QStringLiteral("运行启动项")},
+        {QStringLiteral("Debug Launch"), QStringLiteral("调试启动项")},
+        {QStringLiteral("Stop All Jobs"), QStringLiteral("停止所有任务")},
+        {QStringLiteral("Stop Jobs"), QStringLiteral("停止任务")},
+        {QStringLiteral("Continue"), QStringLiteral("继续")},
+        {QStringLiteral("Pause"), QStringLiteral("暂停")},
+        {QStringLiteral("Restart"), QStringLiteral("重新启动")},
+        {QStringLiteral("Run to Cursor"), QStringLiteral("运行到光标处")},
+        {QStringLiteral("Jump to Cursor"), QStringLiteral("跳转到光标处")},
+        {QStringLiteral("Step Over"), QStringLiteral("单步跳过")},
+        {QStringLiteral("Step Into"), QStringLiteral("单步进入")},
+        {QStringLiteral("Step Out"), QStringLiteral("单步跳出")},
+        {QStringLiteral("Toggle Breakpoint"), QStringLiteral("切换断点")},
+        {QStringLiteral("Show Current Line"), QStringLiteral("显示当前行")},
+        {QStringLiteral("Split View Top/Bottom"), QStringLiteral("上下拆分视图")},
+        {QStringLiteral("Split View Left/Right"), QStringLiteral("左右拆分视图")},
+        {QStringLiteral("Next Split View"), QStringLiteral("下一个拆分视图")},
+        {QStringLiteral("Previous Split View"), QStringLiteral("上一个拆分视图")},
+        {QStringLiteral("Next Window"), QStringLiteral("下一个窗口")},
+        {QStringLiteral("Previous Window"), QStringLiteral("上一个窗口")},
+        {QStringLiteral("Add Tool View..."), QStringLiteral("添加工具视图...")},
+        {QStringLiteral("Show Left Dock"), QStringLiteral("显示左侧栏")},
+        {QStringLiteral("Show Right Dock"), QStringLiteral("显示右侧栏")},
+        {QStringLiteral("Show Bottom Dock"), QStringLiteral("显示底部栏")},
+        {QStringLiteral("Hide All Docks"), QStringLiteral("隐藏所有侧栏")},
+        {QStringLiteral("Focus Editor"), QStringLiteral("聚焦编辑器")},
+        {QStringLiteral("Toggle Concentration Mode"), QStringLiteral("切换专注模式")},
+        {QStringLiteral("Full Screen Mode"), QStringLiteral("全屏模式")},
+        {QStringLiteral("Show Toolbar"), QStringLiteral("显示工具栏")},
+        {QStringLiteral("Show Statusbar"), QStringLiteral("显示状态栏")},
+        {QStringLiteral("Show Menubar"), QStringLiteral("显示菜单栏")},
+        {QStringLiteral("Show Icon Border"), QStringLiteral("显示图标边栏")},
+        {QStringLiteral("Show Line Numbers"), QStringLiteral("显示行号")},
+        {QStringLiteral("Show Folding Markers"), QStringLiteral("显示折叠标记")},
+        {QStringLiteral("Show Scrollbar Marks"), QStringLiteral("显示滚动条标记")},
+        {QStringLiteral("Show Mini-Map"), QStringLiteral("显示迷你地图")},
+        {QStringLiteral("Show Word Count"), QStringLiteral("显示字数统计")},
+        {QStringLiteral("Dynamic Word Wrap"), QStringLiteral("动态自动换行")},
+        {QStringLiteral("Increase Font Sizes"), QStringLiteral("增大字体")},
+        {QStringLiteral("Decrease Font Sizes"), QStringLiteral("减小字体")},
+        {QStringLiteral("Enlarge Font"), QStringLiteral("增大字体")},
+        {QStringLiteral("Shrink Font"), QStringLiteral("减小字体")},
+        {QStringLiteral("Fold Toplevel Nodes"), QStringLiteral("折叠顶层节点")},
+        {QStringLiteral("Unfold Toplevel Nodes"), QStringLiteral("展开顶层节点")},
+        {QStringLiteral("Fold Current Node"), QStringLiteral("折叠当前节点")},
+        {QStringLiteral("Unfold Current Node"), QStringLiteral("展开当前节点")},
+        {QStringLiteral("Set Bookmark"), QStringLiteral("设置书签")},
+        {QStringLiteral("Clear Bookmarks"), QStringLiteral("清除书签")},
+        {QStringLiteral("Previous Bookmark"), QStringLiteral("上一个书签")},
+        {QStringLiteral("Next Bookmark"), QStringLiteral("下一个书签")},
+        {QStringLiteral("Clear Current Line"), QStringLiteral("清除当前行书签")},
+        {QStringLiteral("Configure Shortcuts..."), QStringLiteral("配置快捷键...")},
+        {QStringLiteral("Configure Toolbars..."), QStringLiteral("配置工具栏...")},
+        {QStringLiteral("Configure Notifications..."), QStringLiteral("配置通知...")},
+        {QStringLiteral("Configure RRISE..."), QStringLiteral("配置 RRISE...")},
+        {QStringLiteral("Configure KDevelop..."), QStringLiteral("配置 RRISE...")},
+        {QStringLiteral("Loaded Plugins"), QStringLiteral("已加载插件")},
+        {QStringLiteral("About RRISE"), QStringLiteral("关于 RRISE")},
+        {QStringLiteral("About KDevelop"), QStringLiteral("关于 RRISE")},
+        {QStringLiteral("About KDE"), QStringLiteral("关于 KDE")},
+        {QStringLiteral("Report Bug..."), QStringLiteral("报告问题...")},
+        {QStringLiteral("What's This?"), QStringLiteral("这是什么？")},
+        {QStringLiteral("Donate"), QStringLiteral("捐助")},
+        {QStringLiteral("Switch Application Language..."), QStringLiteral("切换应用程序语言...")},
+        {QStringLiteral("Help Contents"), QStringLiteral("帮助手册")},
+        {QStringLiteral("Back to Code"), QStringLiteral("返回代码")},
+        {QStringLiteral("Current Document Directory"), QStringLiteral("当前文档目录")},
+        {QStringLiteral("Locate Current Document"), QStringLiteral("定位当前文档")},
+        {QStringLiteral("Commit Current Project..."), QStringLiteral("提交当前工程...")},
+        {QStringLiteral("Remove from Build Set"), QStringLiteral("从构建集中移除")},
+        {QStringLiteral("Build All Projects"), QStringLiteral("构建所有工程")},
+        {QStringLiteral("Build Selection"), QStringLiteral("构建选中项")},
+        {QStringLiteral("Install Selection"), QStringLiteral("安装选中项")},
+        {QStringLiteral("Clean Selection"), QStringLiteral("清理选中项")},
+        {QStringLiteral("Configure Selection"), QStringLiteral("配置选中项")},
+        {QStringLiteral("Prune Selection"), QStringLiteral("裁剪选中项")},
+        {QStringLiteral("Assign Shortcut..."), QStringLiteral("分配快捷键...")},
+        {QStringLiteral("Remove Tool View"), QStringLiteral("移除工具视图")},
+    };
+    return translations;
+}
+
+const QHash<QString, QString>& actionNameTranslations()
+{
+    static const QHash<QString, QString> translations = {
+        {QStringLiteral("file_new"), QStringLiteral("新建")},
+        {QStringLiteral("file_open"), QStringLiteral("打开...")},
+        {QStringLiteral("file_open_recent"), QStringLiteral("打开最近使用")},
+        {QStringLiteral("file_save"), QStringLiteral("保存")},
+        {QStringLiteral("file_save_as"), QStringLiteral("另存为...")},
+        {QStringLiteral("file_save_all"), QStringLiteral("全部保存")},
+        {QStringLiteral("file_close"), QStringLiteral("关闭")},
+        {QStringLiteral("file_close_all"), QStringLiteral("全部关闭")},
+        {QStringLiteral("file_closeother"), QStringLiteral("关闭其他")},
+        {QStringLiteral("file_quit"), QStringLiteral("退出")},
+        {QStringLiteral("edit_undo"), QStringLiteral("撤销")},
+        {QStringLiteral("edit_redo"), QStringLiteral("重做")},
+        {QStringLiteral("edit_cut"), QStringLiteral("剪切")},
+        {QStringLiteral("edit_copy"), QStringLiteral("复制")},
+        {QStringLiteral("edit_paste"), QStringLiteral("粘贴")},
+        {QStringLiteral("edit_select_all"), QStringLiteral("全选")},
+        {QStringLiteral("edit_deselect"), QStringLiteral("取消选择")},
+        {QStringLiteral("edit_select_matching_bracket"), QStringLiteral("选择到匹配括号")},
+        {QStringLiteral("edit_toggle_block_selection"), QStringLiteral("切换块选择")},
+        {QStringLiteral("edit_insert_tab"), QStringLiteral("插入制表符")},
+        {QStringLiteral("edit_indent"), QStringLiteral("增加缩进")},
+        {QStringLiteral("edit_unindent"), QStringLiteral("减少缩进")},
+        {QStringLiteral("edit_clean_indent"), QStringLiteral("清理缩进")},
+        {QStringLiteral("edit_align"), QStringLiteral("对齐")},
+        {QStringLiteral("edit_comment"), QStringLiteral("注释")},
+        {QStringLiteral("edit_uncomment"), QStringLiteral("取消注释")},
+        {QStringLiteral("edit_uppercase"), QStringLiteral("转换为大写")},
+        {QStringLiteral("edit_lowercase"), QStringLiteral("转换为小写")},
+        {QStringLiteral("edit_capitalize"), QStringLiteral("首字母大写")},
+        {QStringLiteral("edit_join_lines"), QStringLiteral("合并行")},
+        {QStringLiteral("edit_delete_line"), QStringLiteral("删除当前行")},
+        {QStringLiteral("edit_delete_word_left"), QStringLiteral("删除左侧单词")},
+        {QStringLiteral("edit_delete_word_right"), QStringLiteral("删除右侧单词")},
+        {QStringLiteral("edit_move_line_up"), QStringLiteral("上移行")},
+        {QStringLiteral("edit_move_line_down"), QStringLiteral("下移行")},
+        {QStringLiteral("edit_copy_line_up"), QStringLiteral("向上复制行")},
+        {QStringLiteral("edit_copy_line_down"), QStringLiteral("向下复制行")},
+        {QStringLiteral("edit_find"), QStringLiteral("查找...")},
+        {QStringLiteral("edit_find_next"), QStringLiteral("查找下一个")},
+        {QStringLiteral("edit_find_prev"), QStringLiteral("查找上一个")},
+        {QStringLiteral("edit_replace"), QStringLiteral("替换...")},
+        {QStringLiteral("edit_grep"), QStringLiteral("在文件中查找/替换...")},
+        {QStringLiteral("go_goto_line"), QStringLiteral("转到行...")},
+        {QStringLiteral("to_matching_bracket"), QStringLiteral("转到匹配括号")},
+        {QStringLiteral("select_matching_bracket"), QStringLiteral("选择到匹配括号")},
+        {QStringLiteral("go_next_modified_line"), QStringLiteral("下一个已修改行")},
+        {QStringLiteral("go_prev_modified_line"), QStringLiteral("上一个已修改行")},
+        {QStringLiteral("bookmarks"), QStringLiteral("书签")},
+        {QStringLiteral("set_bookmark"), QStringLiteral("设置书签")},
+        {QStringLiteral("clear_bookmarks"), QStringLiteral("清除书签")},
+        {QStringLiteral("next_bookmark"), QStringLiteral("下一个书签")},
+        {QStringLiteral("prev_bookmark"), QStringLiteral("上一个书签")},
+        {QStringLiteral("view_line_numbers"), QStringLiteral("显示行号")},
+        {QStringLiteral("view_folding_markers"), QStringLiteral("显示折叠标记")},
+        {QStringLiteral("view_icon_border"), QStringLiteral("显示图标边栏")},
+        {QStringLiteral("view_scrollbar_marks"), QStringLiteral("显示滚动条标记")},
+        {QStringLiteral("view_scrollbar_minimap"), QStringLiteral("显示迷你地图")},
+        {QStringLiteral("view_scrollbar_preview"), QStringLiteral("显示滚动条预览")},
+        {QStringLiteral("view_word_count"), QStringLiteral("显示字数统计")},
+        {QStringLiteral("view_dynamic_word_wrap"), QStringLiteral("动态自动换行")},
+        {QStringLiteral("view_word_wrap_marker"), QStringLiteral("显示自动换行标记")},
+        {QStringLiteral("view_non_printable_spaces"), QStringLiteral("显示不可打印空白")},
+        {QStringLiteral("view_indent_lines"), QStringLiteral("显示缩进线")},
+        {QStringLiteral("view_toggle_write_lock"), QStringLiteral("切换只读锁定")},
+        {QStringLiteral("view_full_screen"), QStringLiteral("全屏模式")},
+        {QStringLiteral("tools_scripts"), QStringLiteral("脚本")},
+        {QStringLiteral("tools_mode"), QStringLiteral("模式")},
+        {QStringLiteral("tools_highlighting"), QStringLiteral("语法高亮")},
+        {QStringLiteral("tools_indentation"), QStringLiteral("缩进")},
+        {QStringLiteral("tools_encoding"), QStringLiteral("编码")},
+        {QStringLiteral("tools_eol"), QStringLiteral("行尾格式")},
+        {QStringLiteral("tools_apply_wordwrap"), QStringLiteral("应用自动换行")},
+        {QStringLiteral("tools_cleanIndent"), QStringLiteral("清理缩进")},
+        {QStringLiteral("tools_align"), QStringLiteral("对齐")},
+        {QStringLiteral("tools_comment"), QStringLiteral("注释")},
+        {QStringLiteral("tools_uncomment"), QStringLiteral("取消注释")},
+        {QStringLiteral("tools_uppercase"), QStringLiteral("转换为大写")},
+        {QStringLiteral("tools_lowercase"), QStringLiteral("转换为小写")},
+        {QStringLiteral("tools_capitalize"), QStringLiteral("首字母大写")},
+        {QStringLiteral("tools_join_lines"), QStringLiteral("合并行")},
+        {QStringLiteral("tools_invoke_code_completion"), QStringLiteral("调用代码补全")},
+        {QStringLiteral("tools_spelling"), QStringLiteral("拼写检查")},
+        {QStringLiteral("folding_toplevel"), QStringLiteral("折叠顶层节点")},
+        {QStringLiteral("unfolding_toplevel"), QStringLiteral("展开顶层节点")},
+        {QStringLiteral("folding_current"), QStringLiteral("折叠当前节点")},
+        {QStringLiteral("unfolding_current"), QStringLiteral("展开当前节点")},
+        {QStringLiteral("options_show_toolbar"), QStringLiteral("显示工具栏")},
+        {QStringLiteral("options_show_statusbar"), QStringLiteral("显示状态栏")},
+        {QStringLiteral("options_configure_keybinding"), QStringLiteral("配置快捷键...")},
+        {QStringLiteral("options_configure_toolbars"), QStringLiteral("配置工具栏...")},
+        {QStringLiteral("settings_configure"), QStringLiteral("配置 RRISE...")},
+        {QStringLiteral("configure_notifications"), QStringLiteral("配置通知...")},
+        {QStringLiteral("loaded_plugins"), QStringLiteral("已加载插件")},
+        {QStringLiteral("project_new"), QStringLiteral("从模板新建...")},
+        {QStringLiteral("project_open"), QStringLiteral("打开/导入工程...")},
+        {QStringLiteral("project_fetch"), QStringLiteral("获取工程...")},
+        {QStringLiteral("project_open_recent"), QStringLiteral("打开最近工程")},
+        {QStringLiteral("project_open_for_file"), QStringLiteral("打开当前文件所属工程")},
+        {QStringLiteral("project_open_config"), QStringLiteral("打开配置...")},
+        {QStringLiteral("project_close"), QStringLiteral("关闭工程")},
+        {QStringLiteral("project_close_all"), QStringLiteral("关闭所有工程")},
+        {QStringLiteral("commit_current_project"), QStringLiteral("提交当前工程...")},
+        {QStringLiteral("run_default_target"), QStringLiteral("当前启动目标")},
+        {QStringLiteral("configure_launches"), QStringLiteral("配置启动项...")},
+        {QStringLiteral("run_execute"), QStringLiteral("运行启动项")},
+        {QStringLiteral("run_debug"), QStringLiteral("调试启动项")},
+        {QStringLiteral("run_stop_all"), QStringLiteral("停止所有任务")},
+        {QStringLiteral("run_stop_menu"), QStringLiteral("停止任务")},
+        {QStringLiteral("source_browse_mode"), QStringLiteral("源码浏览模式")},
+        {QStringLiteral("prev_error"), QStringLiteral("跳转到上一个输出标记")},
+        {QStringLiteral("next_error"), QStringLiteral("跳转到下一个输出标记")},
+        {QStringLiteral("split_horizontal"), QStringLiteral("上下拆分视图")},
+        {QStringLiteral("split_vertical"), QStringLiteral("左右拆分视图")},
+        {QStringLiteral("view_next_split"), QStringLiteral("下一个拆分视图")},
+        {QStringLiteral("view_previous_split"), QStringLiteral("上一个拆分视图")},
+        {QStringLiteral("view_next_window"), QStringLiteral("下一个窗口")},
+        {QStringLiteral("view_previous_window"), QStringLiteral("上一个窗口")},
+        {QStringLiteral("add_toolview"), QStringLiteral("添加工具视图...")},
+        {QStringLiteral("show_left_dock"), QStringLiteral("显示左侧栏")},
+        {QStringLiteral("show_right_dock"), QStringLiteral("显示右侧栏")},
+        {QStringLiteral("show_bottom_dock"), QStringLiteral("显示底部栏")},
+        {QStringLiteral("hide_all_docks"), QStringLiteral("隐藏所有侧栏")},
+        {QStringLiteral("focus_editor"), QStringLiteral("聚焦编辑器")},
+        {QStringLiteral("toggle_concentration_mode"), QStringLiteral("切换专注模式")},
+        {QStringLiteral("quick_open"), QStringLiteral("快速打开")},
+        {QStringLiteral("quick_open_file"), QStringLiteral("快速打开文件")},
+        {QStringLiteral("quick_open_class"), QStringLiteral("快速打开类")},
+        {QStringLiteral("quick_open_function"), QStringLiteral("快速打开函数")},
+        {QStringLiteral("quick_open_already_open"), QStringLiteral("快速打开已打开文件")},
+        {QStringLiteral("quick_open_documentation"), QStringLiteral("快速打开文档")},
+        {QStringLiteral("quick_open_actions"), QStringLiteral("快速打开动作")},
+        {QStringLiteral("quick_open_jump_declaration"), QStringLiteral("跳转到声明")},
+        {QStringLiteral("quick_open_jump_definition"), QStringLiteral("跳转到定义")},
+        {QStringLiteral("quick_open_next_function"), QStringLiteral("下一个函数")},
+        {QStringLiteral("quick_open_prev_function"), QStringLiteral("上一个函数")},
+        {QStringLiteral("quick_open_outline"), QStringLiteral("大纲")},
+        {QStringLiteral("edit_reformat_source"), QStringLiteral("重新格式化源码")},
+        {QStringLiteral("edit_reformat_line"), QStringLiteral("重新格式化当前行")},
+        {QStringLiteral("tools_astyle"), QStringLiteral("重新格式化文件...")},
+        {QStringLiteral("document_declaration"), QStringLiteral("生成文档声明")},
+        {QStringLiteral("showDocumentation"), QStringLiteral("显示文档")},
+    };
+    return translations;
+}
+
+void localizeMenu(QMenu* menu)
+{
+    if (!menu) {
+        return;
+    }
+
+    for (QAction* action : menu->actions()) {
+        if (!action || action->isSeparator()) {
+            continue;
+        }
+
+        const auto nameIt = actionNameTranslations().constFind(action->objectName());
+        if (nameIt != actionNameTranslations().constEnd()) {
+            action->setText(*nameIt);
+        } else {
+            const QString key = normalizedMenuTitle(action->text());
+            const auto textIt = actionTextTranslations().constFind(key);
+            if (textIt != actionTextTranslations().constEnd()) {
+                action->setText(*textIt);
+            }
+        }
+
+        QMenu* const subMenu = action->menu();
+        if (!subMenu) {
+            continue;
+        }
+
+        const QString menuKey = normalizedMenuTitle(action->text());
+        const auto titleIt = menuTitleTranslations().constFind(menuKey);
+        if (titleIt != menuTitleTranslations().constEnd()) {
+            action->setText(*titleIt);
+            subMenu->setTitle(*titleIt);
+        }
+        localizeMenu(subMenu);
+    }
+}
+
+}
+
+void MainWindow::createGUI(KParts::Part* part)
+{
+    Sublime::MainWindow::setWindowTitleHandling(false);
+    Sublime::MainWindow::createGUI(part);
+    localizeTopLevelMenus();
+    QTimer::singleShot(0, this, &MainWindow::localizeTopLevelMenus);
+}
+
+void MainWindow::localizeTopLevelMenus()
+{
     for (QAction* action : menuBar()->actions()) {
         QMenu* const menu = action->menu();
         if (!menu) {
@@ -118,13 +500,19 @@ void MainWindow::localizeTopLevelMenus()
         }
 
         const QString key = normalizedMenuTitle(action->text());
-        const auto titleIt = menuTitles.constFind(key);
-        if (titleIt == menuTitles.constEnd()) {
-            continue;
+        const auto titleIt = menuTitleTranslations().constFind(key);
+        if (titleIt != menuTitleTranslations().constEnd()) {
+            action->setText(*titleIt);
+            menu->setTitle(*titleIt);
         }
 
-        action->setText(*titleIt);
-        menu->setTitle(*titleIt);
+        if (!menu->property("_rrise_menu_localized").toBool()) {
+            menu->setProperty("_rrise_menu_localized", true);
+            connect(menu, &QMenu::aboutToShow, menu, [menu] {
+                localizeMenu(menu);
+            });
+        }
+        localizeMenu(menu);
     }
 }
 

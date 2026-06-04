@@ -162,6 +162,36 @@ function Copy-HicolorIconThemeIndex([string]$SourceBin, [string]$PayloadRoot) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $destDir "index.theme") -Force
 }
 
+function Copy-Kf6ZhCnTranslations([string]$CraftRoot, [string]$PayloadRoot) {
+    $sourceDir = Join-Path $CraftRoot "bin\data\locale\zh_CN\LC_MESSAGES"
+    if (-not (Test-Path -LiteralPath $sourceDir)) {
+        Write-Warning "KF6 zh_CN translation directory not found: $sourceDir"
+        return
+    }
+
+    $destDir = Join-Path $PayloadRoot "bin\data\locale\zh_CN\LC_MESSAGES"
+    New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+
+    $catalogs = @(
+        "kcolorscheme6.mo",
+        "kconfigwidgets6.mo",
+        "kiconthemes6.mo",
+        "kio6.mo",
+        "kparts6.mo",
+        "ktexteditor6.mo",
+        "kxmlgui6.mo"
+    )
+
+    foreach ($catalog in $catalogs) {
+        $source = Join-Path $sourceDir $catalog
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $destDir $catalog) -Force
+        } else {
+            Write-Warning "Optional KF6 zh_CN translation not found: $source"
+        }
+    }
+}
+
 function Remove-RriseDisabledPlugins([string]$PayloadRoot) {
     $plugins = @(
         "lib\plugins\kdevplatform\66\kdevcraft.dll"
@@ -544,6 +574,8 @@ Write-Host "Copying non-Qt Craft runtime DLLs..."
 Copy-CraftRuntimeDlls $craftBin (Join-Path $appPayload "bin")
 Write-Host "Copying hicolor icon theme index..."
 Copy-HicolorIconThemeIndex $craftBin $appPayload
+Write-Host "Copying KF6 zh_CN translations..."
+Copy-Kf6ZhCnTranslations $CraftRoot $appPayload
 Write-Host "Overriding selected KF6 runtime DLLs with system Qt builds..."
 Copy-SystemQtKf6Overrides $systemQtKf6Bin (Join-Path $appPayload "bin")
 

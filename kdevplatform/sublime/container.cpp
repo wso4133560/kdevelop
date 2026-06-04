@@ -109,6 +109,11 @@ public:
         setDocumentMode(true);
         setUsesScrollButtons(true);
         setElideMode(Qt::ElideNone);
+        setStyleSheet(QStringLiteral(
+            "QTabBar::tab:selected {"
+            "background: #fff3b0;"
+            "color: #1f2328;"
+            "}"));
     }
 
     bool event(QEvent* ev) override {
