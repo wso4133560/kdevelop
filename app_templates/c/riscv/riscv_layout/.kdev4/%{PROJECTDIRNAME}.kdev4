@@ -6,14 +6,14 @@ BuildDir=
 Title=RRISE CK803 %{APPNAMELC}
 
 [CustomBuildSystem][BuildConfig0][ToolBuild]
-Arguments=/c "utilities\kdevelop\build_all.cmd" %{APPNAMELC}
+Arguments=/c "utilities/kdevelop/build_all.cmd" %{APPNAMELC}
 Enabled=true
 Environment=
 Executable=%COMSPEC%
 Type=0
 
 [CustomBuildSystem][BuildConfig0][ToolClean]
-Arguments=/c "utilities\kdevelop\clean_csky_target.cmd" %{APPNAMELC}
+Arguments=/c "utilities/kdevelop/clean_csky_target.cmd" %{APPNAMELC}
 Enabled=true
 Environment=
 Executable=%COMSPEC%
@@ -60,7 +60,7 @@ Dependency Action=Nothing
 Display Demangle Names=true
 Display Static Members=false
 EnvironmentGroup=
-Executable=%COMSPEC%
+Executable=Obj/%{APPNAMELC}.elf
 External Terminal=
 GDB Path=%RRISE_TOOLKIT_ROOT%/compiler/CKV2ElfMinilib_V3.10.29/bin/csky-elfabiv2-gdb.exe
 Kill Before Executing Again=0

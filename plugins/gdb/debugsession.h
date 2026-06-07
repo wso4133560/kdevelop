@@ -47,6 +47,8 @@ public:
     /// Whether turn off auto-disable ASLR when starting inferiors
     void setAutoDisableASLR(bool enable);
 
+    [[nodiscard]] bool preferHardwareBreakpoints() const override;
+
 protected:
     GdbDebugger *createDebugger() const override;
     void initializeDebugger() override;
@@ -60,6 +62,7 @@ protected:
     void loadCoreFile(const QString& coreFile) override;
 
 private Q_SLOTS:
+    void slotInferiorStopped(const MI::AsyncRecord& r) override;
     void handleVersion(const QStringList& s);
     void handleCoreFile(const MI::ResultRecord& r);
 
@@ -70,6 +73,8 @@ private:
     QProcess* m_debugServerProcess = nullptr;
 
     bool m_autoDisableASLR = false;
+    bool m_preferHardwareBreakpoints = false;
+    bool m_remoteConfigScriptInProgress = false;
 };
 
 } // end of namespace GDB

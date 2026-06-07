@@ -40,9 +40,9 @@ QString displayLaunchName(const QString& launchName)
 
 bool usesRemoteGdbScripts(const KConfigGroup& grp)
 {
-    return grp.readEntry(GDB::Config::RemoteGdbConfigEntry, QUrl()).isValid()
-        || grp.readEntry(GDB::Config::RemoteGdbShellEntry, QUrl()).isValid()
-        || grp.readEntry(GDB::Config::RemoteGdbRunEntry, QUrl()).isValid();
+    return !grp.readEntry(GDB::Config::RemoteGdbConfigEntry, QString()).trimmed().isEmpty()
+        || !grp.readEntry(GDB::Config::RemoteGdbShellEntry, QString()).trimmed().isEmpty()
+        || !grp.readEntry(GDB::Config::RemoteGdbRunEntry, QString()).trimmed().isEmpty();
 }
 }
 

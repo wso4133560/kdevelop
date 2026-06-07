@@ -31,6 +31,22 @@ using namespace KDevMI::GDB;
 using namespace KDevMI::MI;
 
 namespace {
+QString packagedRriseToolkitRoot()
+{
+#ifdef Q_OS_WIN
+    QDir appDir(QApplication::applicationDirPath());
+    if (appDir.dirName().compare(QLatin1String("bin"), Qt::CaseInsensitive) == 0) {
+        appDir.cdUp();
+    }
+
+    const QString toolkitRoot = QDir::cleanPath(appDir.filePath(QStringLiteral("riscv_toolkit")));
+    if (QFileInfo::exists(toolkitRoot)) {
+        return toolkitRoot;
+    }
+#endif
+    return {};
+}
+
 QString expandWindowsEnvironmentVariables(QString value)
 {
 #ifdef Q_OS_WIN
@@ -48,7 +64,10 @@ QString expandWindowsEnvironmentVariables(QString value)
         }
 
         const QString name = value.mid(start + 1, end - start - 1);
-        const QString replacement = environment.value(name);
+        QString replacement = environment.value(name);
+        if (replacement.isEmpty() && name.compare(QLatin1String("RRISE_TOOLKIT_ROOT"), Qt::CaseInsensitive) == 0) {
+            replacement = packagedRriseToolkitRoot();
+        }
         if (replacement.isEmpty()) {
             searchFrom = end + 1;
             continue;
@@ -109,10 +128,10 @@ bool GdbDebugger::start(KConfigGroup& config, const QStringList& extraArguments)
 
     QString fullCommand;
 
-    QUrl shell = config.readEntry(Config::DebuggerShellEntry, QUrl());
+    const QString shell = resolveDebuggerExecutable(config.readEntry(Config::DebuggerShellEntry, QString()).trimmed());
     if(!shell.isEmpty()) {
         qCDebug(DEBUGGERGDB) << "have shell" << shell;
-        QString shell_without_args = shell.toLocalFile().split(QLatin1Char(' ')).first();
+        QString shell_without_args = shell.split(QLatin1Char(' ')).first();
 
         QFileInfo info(shell_without_args);
         /*if( info.isRelative() )
@@ -128,7 +147,7 @@ bool GdbDebugger::start(KConfigGroup& config, const QStringList& extraArguments)
         }
 
         arguments.insert(0, m_debuggerExecutable);
-        arguments.insert(0, shell.toLocalFile());
+        arguments.insert(0, shell);
         m_process->setShellCommand(KShell::joinArgs(arguments));
     } else {
         m_process->setProgram(m_debuggerExecutable, arguments);

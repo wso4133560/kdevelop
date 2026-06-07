@@ -8,6 +8,7 @@
 #include "runcontroller.h"
 
 #include <QDBusConnection>
+#include <QInputDialog>
 #include <QPalette>
 #include <QPointer>
 
@@ -27,6 +28,7 @@
 #include <project/builderjob.h>
 #include <project/projectmodel.h>
 #include <sublime/message.h>
+#include <util/path.h>
 
 #include "core.h"
 #include "uicontroller.h"
@@ -139,16 +141,8 @@ public:
     }
     void saveCurrentLaunchAction()
     {
-        if (!currentTargetAction) return;
-
-        if( currentTargetAction->currentAction() )
-        {
-            KConfigGroup grp = Core::self()->activeSession()->config()->group( Strings::LaunchConfigurationsGroup() );
-            LaunchConfiguration* l = static_cast<LaunchConfiguration*>( currentTargetAction->currentAction()->data().value<void*>() );
-            grp.writeEntry( Strings::CurrentLaunchConfigProjectEntry(), l->project() ? l->project()->name() : QString() );
-            grp.writeEntry( Strings::CurrentLaunchConfigNameEntry(), l->configGroupName() );
-            grp.sync();
-        }
+        // RRISE: avoid writing launch selection into the session while switching
+        // targets. In the packaged runtime this path can crash inside KF6ConfigCore.
     }
 
     QString launchActionText( LaunchConfiguration* l )
@@ -282,6 +276,77 @@ public:
             return launch->project() == project;
         });
         return it == launchConfigurations.constEnd() ? nullptr : *it;
+    }
+
+    LaunchConfiguration* projectLaunchForMode(IProject* project, const QString& mode) const
+    {
+        if (!project) {
+            return nullptr;
+        }
+
+        const auto it = std::find_if(launchConfigurations.constBegin(), launchConfigurations.constEnd(),
+                                     [project, &mode](LaunchConfiguration* launch) {
+            return launch->project() == project && !launch->launcherForMode(mode).isEmpty();
+        });
+        return it == launchConfigurations.constEnd() ? nullptr : *it;
+    }
+
+    QList<LaunchConfiguration*> projectLaunchesForMode(const QString& mode) const
+    {
+        QList<LaunchConfiguration*> launches;
+        const auto projects = Core::self()->projectController()->projects();
+        launches.reserve(projects.size());
+
+        for (IProject* project : projects) {
+            if (auto* launch = projectLaunchForMode(project, mode)) {
+                launches << launch;
+            }
+        }
+
+        return launches;
+    }
+
+    LaunchConfiguration* chooseProjectLaunchForMode(const QString& mode)
+    {
+        const auto launches = projectLaunchesForMode(mode);
+        if (launches.size() == 1) {
+            return launches.constFirst();
+        }
+
+        if (launches.isEmpty()) {
+            if (auto* currentLaunch = launchFromCurrentAction(); currentLaunch && !currentLaunch->launcherForMode(mode).isEmpty()) {
+                return currentLaunch;
+            }
+            return nullptr;
+        }
+
+        QStringList labels;
+        labels.reserve(launches.size());
+        for (LaunchConfiguration* launch : launches) {
+            IProject* project = launch->project();
+            const QString projectPath = project->path().pathOrUrl();
+            labels << i18nc("@item:inlistbox project launch choice", "%1 - %2", project->name(), projectPath);
+        }
+
+        bool accepted = false;
+        const QString selected = QInputDialog::getItem(Core::self()->uiController()->activeMainWindow(),
+                                                       i18nc("@title:window", "选择调试项目"),
+                                                       i18nc("@label:listbox", "要调试的项目："),
+                                                       labels,
+                                                       0,
+                                                       false,
+                                                       &accepted);
+        if (!accepted) {
+            return nullptr;
+        }
+
+        const int selectedIndex = labels.indexOf(selected);
+        if (selectedIndex < 0 || selectedIndex >= launches.size()) {
+            return nullptr;
+        }
+
+        auto* launch = launches.at(selectedIndex);
+        return launch;
     }
 
     bool selectProjectLaunch(IProject* project)
@@ -640,7 +705,9 @@ void RunController::debugCurrentLaunch()
     }
 
     if (!d->launchConfigurations.isEmpty()) {
-        execute(QStringLiteral("debug"), d->preferredLaunch());
+        if (auto* launch = d->chooseProjectLaunchForMode(QStringLiteral("debug"))) {
+            execute(QStringLiteral("debug"), launch);
+        }
     }
 }
 

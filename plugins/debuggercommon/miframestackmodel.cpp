@@ -13,6 +13,8 @@
 
 #include <KLocalizedString>
 
+#include <QPointer>
+
 #include <algorithm>
 
 using namespace KDevelop;
@@ -52,7 +54,12 @@ MIDebugSession * MIFrameStackModel::session()
 
 void MIFrameStackModel::fetchThreads()
 {
-    session()->addCommand(ThreadInfo, QString(), this, &MIFrameStackModel::handleThreadInfo);
+    const QPointer<MIFrameStackModel> guardedThis(this);
+    session()->addCommand(ThreadInfo, QString(), [guardedThis](const ResultRecord& r) {
+        if (guardedThis) {
+            guardedThis->handleThreadInfo(r);
+        }
+    });
 }
 
 void MIFrameStackModel::handleThreadInfo(const ResultRecord& r)
@@ -99,6 +106,10 @@ struct FrameListHandler : public MICommandHandler
 
     void handle(const ResultRecord &r) override
     {
+        if (!model) {
+            return;
+        }
+
         static const auto levelField = QStringLiteral("level");
         const Value& stack = r[QStringLiteral("stack")];
         const auto& firstFrame = stack[0];
@@ -143,7 +154,7 @@ struct FrameListHandler : public MICommandHandler
         model->setHasMoreFrames(m_thread, hasMore);
     }
 private:
-    MIFrameStackModel* model;
+    QPointer<MIFrameStackModel> model;
     int m_thread;
     int m_to;
 };

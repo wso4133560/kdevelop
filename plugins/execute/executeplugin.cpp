@@ -62,7 +62,7 @@ QString expandWindowsEnvironmentVariables(QString value)
     return value;
 }
 
-QUrl resolveConfiguredLocalUrl(const QString& rawValue)
+QUrl resolveConfiguredLocalUrl(const QString& rawValue, const QString& baseDir = {})
 {
     if (rawValue.isEmpty()) {
         return {};
@@ -80,6 +80,9 @@ QUrl resolveConfiguredLocalUrl(const QString& rawValue)
     }
     if (QDir::isAbsolutePath(expanded)) {
         return QUrl::fromLocalFile(QDir::cleanPath(expanded));
+    }
+    if (!baseDir.isEmpty()) {
+        return QUrl::fromLocalFile(QDir(baseDir).absoluteFilePath(expanded));
     }
 
     return QUrl(expanded);
@@ -180,7 +183,8 @@ QUrl ExecutePlugin::executable( KDevelop::ILaunchConfiguration* cfg, QString& er
     KConfigGroup grp = cfg->config();
     if( grp.readEntry(ExecutePlugin::isExecutableEntry, false ) )
     {
-        executable = resolveConfiguredLocalUrl(grp.readEntry(ExecutePlugin::executableEntry, QString()));
+        const QString projectDir = cfg->project() ? cfg->project()->path().toLocalFile() : QString();
+        executable = resolveConfiguredLocalUrl(grp.readEntry(ExecutePlugin::executableEntry, QString()), projectDir);
     } else
     {
         QStringList prjitem = grp.readEntry( ExecutePlugin::projectTargetEntry, QStringList() );
@@ -262,7 +266,8 @@ QUrl ExecutePlugin::workingDirectory( KDevelop::ILaunchConfiguration* cfg ) cons
         return QUrl();
     }
 
-    const auto workingDir = cfg->config().readEntry(ExecutePlugin::workingDirEntry, QUrl());
+    const auto workingDir = resolveConfiguredLocalUrl(
+        cfg->config().readEntry(ExecutePlugin::workingDirEntry, QString()).trimmed());
     if (workingDir.isEmpty()) {
         return cfg->project() ? cfg->project()->path().toUrl() : QUrl();
     }

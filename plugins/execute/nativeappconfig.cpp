@@ -28,6 +28,7 @@
 
 #include <QIcon>
 #include <QMenu>
+#include <QUrl>
 
 #include <KConfigGroup>
 #include <KLineEdit>
@@ -38,6 +39,21 @@
 using namespace KDevelop;
 
 namespace {
+QUrl readConfiguredUrl(const KConfigGroup& cfg, const char* entry)
+{
+    const QString rawValue = cfg.readEntry(entry, QString()).trimmed();
+    if (rawValue.isEmpty()) {
+        return {};
+    }
+
+    const QUrl url(rawValue);
+    if (url.isValid() && (!url.isRelative() || url.isLocalFile())) {
+        return url;
+    }
+
+    return QUrl::fromUserInput(rawValue);
+}
+
 /**
  * @return the instance of the execute plugin
  * @pre the execute plugin is loaded
@@ -77,7 +93,7 @@ void NativeAppConfigPage::loadFromConfiguration(const KConfigGroup& cfg, KDevelo
     projectTarget->setBaseItem( project ? project->projectItem() : nullptr, true);
     projectTarget->setCurrentItemPath( cfg.readEntry( ExecutePlugin::projectTargetEntry, QStringList() ) );
 
-    QUrl exe = cfg.readEntry( ExecutePlugin::executableEntry, QUrl());
+    QUrl exe = readConfiguredUrl(cfg, ExecutePlugin::executableEntry);
     if( !exe.isEmpty() || project ){
         executablePath->setUrl( !exe.isEmpty() ? exe : project->path().toUrl() );
     }else{
@@ -97,7 +113,7 @@ void NativeAppConfigPage::loadFromConfiguration(const KConfigGroup& cfg, KDevelo
 
     arguments->setClearButtonEnabled( true );
     arguments->setText( cfg.readEntry( ExecutePlugin::argumentsEntry, "" ) );
-    workingDirectory->setUrl( cfg.readEntry( ExecutePlugin::workingDirEntry, QUrl() ) );
+    workingDirectory->setUrl(readConfiguredUrl(cfg, ExecutePlugin::workingDirEntry));
     environment->setCurrentProfile(cfg.readEntry(ExecutePlugin::environmentProfileEntry, QString()));
     runInTerminal->setChecked( cfg.readEntry( ExecutePlugin::useTerminalEntry, false ) );
     terminal->setEditText( cfg.readEntry( ExecutePlugin::terminalEntry, terminal->itemText(0) ) );

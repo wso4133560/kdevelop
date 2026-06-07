@@ -129,6 +129,8 @@ public:
     bool debuggerStateIsOn(DBGStateFlags state) const;
     DBGStateFlags debuggerState() const;
 
+    [[nodiscard]] virtual bool preferHardwareBreakpoints() const;
+
     bool hasCrashed() const;
 
     /**

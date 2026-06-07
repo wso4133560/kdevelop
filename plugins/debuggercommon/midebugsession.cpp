@@ -484,6 +484,11 @@ DBGStateFlags MIDebugSession::debuggerState() const
     return m_debuggerState;
 }
 
+bool MIDebugSession::preferHardwareBreakpoints() const
+{
+    return false;
+}
+
 void MIDebugSession::setDebuggerStateOn(DBGStateFlags stateOn)
 {
     DBGStateFlags oldState = m_debuggerState;

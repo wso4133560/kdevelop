@@ -17,6 +17,23 @@
 
 namespace Config = KDevMI::GDB::Config;
 
+namespace {
+QUrl readConfiguredUrl(const KConfigGroup& cfg, const char* entry)
+{
+    const QString rawValue = cfg.readEntry(entry, QString()).trimmed();
+    if (rawValue.isEmpty()) {
+        return {};
+    }
+
+    const QUrl url(rawValue);
+    if (url.isValid() && (!url.isRelative() || url.isLocalFile())) {
+        return url;
+    }
+
+    return QUrl::fromUserInput(rawValue);
+}
+}
+
 GdbConfigPage::GdbConfigPage( QWidget* parent )
     : LaunchConfigurationPage(parent), ui( new Ui::GdbConfigPage )
 {
@@ -51,11 +68,11 @@ QIcon GdbConfigPage::icon() const
 void GdbConfigPage::loadFromConfiguration( const KConfigGroup& cfg, KDevelop::IProject*  )
 {
     bool block = blockSignals( true );
-    ui->kcfg_gdbPath->setUrl( cfg.readEntry( Config::GdbPathEntry, QUrl() ) );
-    ui->kcfg_debuggingShell->setUrl( cfg.readEntry( Config::DebuggerShellEntry, QUrl() ) );
-    ui->kcfg_configGdbScript->setUrl( cfg.readEntry( Config::RemoteGdbConfigEntry, QUrl() ) );
-    ui->kcfg_runShellScript->setUrl( cfg.readEntry( Config::RemoteGdbShellEntry, QUrl() ) );
-    ui->kcfg_runGdbScript->setUrl( cfg.readEntry( Config::RemoteGdbRunEntry, QUrl() ) );
+    ui->kcfg_gdbPath->setUrl(readConfiguredUrl(cfg, Config::GdbPathEntry));
+    ui->kcfg_debuggingShell->setUrl(readConfiguredUrl(cfg, Config::DebuggerShellEntry));
+    ui->kcfg_configGdbScript->setUrl(readConfiguredUrl(cfg, Config::RemoteGdbConfigEntry));
+    ui->kcfg_runShellScript->setUrl(readConfiguredUrl(cfg, Config::RemoteGdbShellEntry));
+    ui->kcfg_runGdbScript->setUrl(readConfiguredUrl(cfg, Config::RemoteGdbRunEntry));
     ui->kcfg_displayStaticMembers->setChecked( cfg.readEntry( Config::StaticMembersEntry, false ) );
     ui->kcfg_asmDemangle->setChecked( cfg.readEntry( Config::DemangleNamesEntry, true) );
     ui->kcfg_startWith->setCurrentIndex( ui->kcfg_startWith->findData( cfg.readEntry( KDevMI::Config::StartWithEntry, "ApplicationOutput" ) ) );

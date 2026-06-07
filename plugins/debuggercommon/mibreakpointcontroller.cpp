@@ -20,13 +20,27 @@
 
 #include <KLocalizedString>
 
+#include <QDateTime>
+#include <QFile>
 #include <QRegExp>
+#include <QTextStream>
 
 using namespace KDevMI;
 using namespace KDevMI::MI;
 using namespace KDevelop;
 
 namespace {
+
+void appendRriseTrace(const QString& message)
+{
+    QFile file(QStringLiteral("D:/tmp/rrise-gdb-mi-trace.log"));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+
+    QTextStream stream(&file);
+    stream << QDateTime::currentDateTime().toString(Qt::ISODateWithMs) << " " << message << '\n';
+}
 
 class ActualBreakpointLocation
 {
@@ -166,6 +180,9 @@ struct MIBreakpointController::InsertedHandler : public MIBreakpointController::
 
     void handle(const ResultRecord &r) override
     {
+        appendRriseTrace(QStringLiteral("break-insert result reason=%1%2")
+                             .arg(r.reason,
+                                  r.isReasonError() ? QStringLiteral(" error=") + r.errorMessage() : QString()));
         Handler::handle(r);
 
         int row = controller->breakpointRow(breakpoint);
@@ -376,7 +393,7 @@ void MIBreakpointController::createBreakpoint(int row)
     if (modelBreakpoint->location().isEmpty())
         return;
 
-    if (modelBreakpoint->kind() == Breakpoint::CodeBreakpoint) {
+        if (modelBreakpoint->kind() == Breakpoint::CodeBreakpoint) {
         QString location;
         if (modelBreakpoint->line() != -1) {
             location = QStringLiteral("%0:%1")
@@ -392,6 +409,8 @@ void MIBreakpointController::createBreakpoint(int row)
 
         // Note: We rely on '-f' to be automatically added by the MICommand logic
         QString arguments;
+        if (debugSession()->preferHardwareBreakpoints())
+            arguments += QLatin1String("-h ");
         if (!modelBreakpoint->enabled())
             arguments += QLatin1String("-d ");
         if (!modelBreakpoint->condition().isEmpty())
@@ -399,6 +418,11 @@ void MIBreakpointController::createBreakpoint(int row)
         if (modelBreakpoint->ignoreHits() != 0)
             arguments += QStringLiteral("-i %0 ").arg(modelBreakpoint->ignoreHits());
         arguments += Utils::quoteExpression(location);
+        appendRriseTrace(QStringLiteral("create breakpoint row=%1 preferHardware=%2 location=%3 arguments=%4")
+                             .arg(row)
+                             .arg(debugSession()->preferHardwareBreakpoints() ? QStringLiteral("true") : QStringLiteral("false"))
+                             .arg(location)
+                             .arg(arguments));
 
         BreakpointModel::ColumnFlags sent =
             BreakpointModel::EnableColumnFlag |

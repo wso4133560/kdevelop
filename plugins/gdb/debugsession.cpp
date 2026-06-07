@@ -28,6 +28,7 @@
 #include <interfaces/ilaunchconfiguration.h>
 #include <interfaces/iproject.h>
 #include <interfaces/iuicontroller.h>
+#include <shell/launchconfiguration.h>
 #include <util/environmentprofilelist.h>
 #include <util/path.h>
 
@@ -37,12 +38,15 @@
 #include <KParts/MainWindow>
 #include <KShell>
 
+#include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QRegularExpression>
+#include <QTextStream>
 #include <QThread>
 #include <QVersionNumber>
 
@@ -52,19 +56,92 @@ using namespace KDevelop;
 
 namespace {
 constexpr int debugServerPort = 39000;
+constexpr int debugServerStartupTimeoutMs = 30000;
 QProcess* preflightDebugServerProcess = nullptr;
 
-QString resolveLaunchLocalPath(const QUrl& url, KDevelop::ILaunchConfiguration* cfg, IExecutePlugin* iexec)
+void appendRriseTrace(const QString& message)
 {
-    if (url.isEmpty()) {
+    if (!qEnvironmentVariableIsSet("RRISE_GDB_MI_TRACE")) {
+        return;
+    }
+
+    QFile file(QStringLiteral("D:/tmp/rrise-gdb-mi-trace.log"));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+
+    QTextStream stream(&file);
+    stream << QDateTime::currentDateTime().toString(Qt::ISODateWithMs) << " " << message << '\n';
+}
+
+QString readLaunchPathEntry(ILaunchConfiguration* cfg, const char* entry)
+{
+    const auto* launch = dynamic_cast<const LaunchConfiguration*>(cfg);
+    if (!launch || !cfg->project()) {
         return {};
     }
 
+    const QString projectFile = cfg->project()->projectFile().toLocalFile();
+    const QFileInfo projectFileInfo(projectFile);
+    const QString projectName = projectFileInfo.completeBaseName();
+    const QString projectDir = cfg->project()->path().toLocalFile();
+    const QStringList configFiles = {
+        QDir(projectDir).filePath(QStringLiteral(".kdev4/%1.kdev4").arg(projectName)),
+        projectFile,
+    };
+
+    auto readEntryFromFile = [launch, entry](const QString& filePath) -> QString {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return {};
+        }
+
+        const QString targetSection =
+            QStringLiteral("[Launch][%1][Data]").arg(launch->configGroupName());
+        const QString key = QString::fromLatin1(entry) + QLatin1Char('=');
+        bool inTargetSection = false;
+
+        QTextStream stream(&file);
+        while (!stream.atEnd()) {
+            const QString line = stream.readLine().trimmed();
+            if (line.startsWith(QLatin1Char('[')) && line.endsWith(QLatin1Char(']'))) {
+                inTargetSection = (line == targetSection);
+                continue;
+            }
+            if (inTargetSection && line.startsWith(key)) {
+                return line.mid(key.size()).trimmed();
+            }
+        }
+
+        return {};
+    };
+
+    for (const QString& filePath : configFiles) {
+        const QString value = readEntryFromFile(filePath);
+        if (!value.isEmpty()) {
+            appendRriseTrace(QStringLiteral("read launch entry %1 from %2 value=%3")
+                                 .arg(QString::fromLatin1(entry), filePath, value));
+            return value;
+        }
+    }
+
+    appendRriseTrace(QStringLiteral("launch entry %1 not found projectFile=%2 projectDir=%3 group=%4")
+                         .arg(QString::fromLatin1(entry), projectFile, projectDir, launch->configGroupName()));
+    return {};
+}
+
+QString resolveLaunchLocalPath(const QString& rawPath, KDevelop::ILaunchConfiguration* cfg, IExecutePlugin* iexec)
+{
+    if (rawPath.isEmpty()) {
+        return {};
+    }
+
+    const QUrl url(rawPath);
     if (url.isLocalFile()) {
         return url.toLocalFile();
     }
 
-    const QString path = url.toString();
+    const QString path = rawPath;
     if (QDir::isAbsolutePath(path)) {
         return QDir::cleanPath(path);
     }
@@ -84,15 +161,22 @@ bool isDebugServerListening()
 {
 #ifdef Q_OS_WIN
     QProcess netstat;
-    netstat.start(QStringLiteral("cmd.exe"),
-                  {QStringLiteral("/c"),
-                   QStringLiteral("netstat -ano | findstr /R /C:\":%1 .*LISTENING\" >nul").arg(debugServerPort)});
+    netstat.start(QStringLiteral("netstat"), {QStringLiteral("-ano")});
     if (!netstat.waitForFinished(3000)) {
         netstat.kill();
         netstat.waitForFinished();
         return false;
     }
-    return netstat.exitStatus() == QProcess::NormalExit && netstat.exitCode() == 0;
+
+    if (netstat.exitStatus() != QProcess::NormalExit || netstat.exitCode() != 0) {
+        return false;
+    }
+
+    const QString output = QString::fromLocal8Bit(netstat.readAllStandardOutput());
+    const QRegularExpression listeningLine(
+        QStringLiteral(R"(^\s*TCP\s+\S+:%1\s+\S+\s+LISTENING\s+\d+\s*$)").arg(debugServerPort),
+        QRegularExpression::CaseInsensitiveOption | QRegularExpression::MultilineOption);
+    return output.contains(listeningLine);
 #else
     return false;
 #endif
@@ -105,6 +189,19 @@ void showBoardNotConnectedDialog()
         QStringLiteral("\u672a\u68c0\u6d4b\u5230\u8c03\u8bd5\u677f\u5361\u8fde\u63a5\u3002"
                        "\u8bf7\u786e\u8ba4 CKLink/\u677f\u5361\u5df2\u8fde\u63a5\u5e76\u4e0a\u7535\u540e\u518d\u70b9\u51fb\u8c03\u8bd5\u3002"),
         QStringLiteral("\u8c03\u8bd5\u677f\u5361\u672a\u8fde\u63a5"));
+}
+
+void showDebugServerStartupFailedDialog(const QString& output)
+{
+    QString message = QStringLiteral("\u8c03\u8bd5\u670d\u52a1\u672a\u80fd\u542f\u52a8\uff0c\u8bf7\u786e\u8ba4 CKLink/\u677f\u5361\u5df2\u8fde\u63a5\u5e76\u4e0a\u7535\u3002");
+    if (!output.isEmpty()) {
+        message += QStringLiteral("\n\n\u8c03\u8bd5\u670d\u52a1\u8f93\u51fa\uff1a\n%1").arg(output);
+    }
+
+    KMessageBox::error(
+        KDevelop::ICore::self()->uiController()->activeMainWindow(),
+        message,
+        QStringLiteral("\u8c03\u8bd5\u670d\u52a1\u542f\u52a8\u5931\u8d25"));
 }
 
 }
@@ -133,6 +230,11 @@ DebugSession::~DebugSession()
 void DebugSession::setAutoDisableASLR(bool enable)
 {
     m_autoDisableASLR = enable;
+}
+
+bool DebugSession::preferHardwareBreakpoints() const
+{
+    return m_preferHardwareBreakpoints;
 }
 
 BreakpointController *DebugSession::breakpointController() const
@@ -207,8 +309,8 @@ bool DebugSession::prepareRemoteDebugging(const InferiorStartupInfo& startupInfo
     Q_ASSERT(cfg);
     Q_ASSERT(iexec);
 
-    const QUrl configGdbScriptUrl = cfg->config().readEntry(Config::RemoteGdbConfigEntry, QUrl());
-    const QString configGdbScript = resolveLaunchLocalPath(configGdbScriptUrl, cfg, iexec);
+    const QString configGdbScript = resolveLaunchLocalPath(
+        readLaunchPathEntry(cfg, Config::RemoteGdbConfigEntry), cfg, iexec);
     if (configGdbScript.isEmpty()) {
         return true;
     }
@@ -237,7 +339,7 @@ bool DebugSession::prepareRemoteDebugging(const InferiorStartupInfo& startupInfo
     if (!preflightDebugServerProcess->waitForStarted(3000)) {
         qCWarning(DEBUGGERGDB) << "failed to start CK803 debug server script" << debugServerScript
                                << preflightDebugServerProcess->errorString();
-        showBoardNotConnectedDialog();
+        showDebugServerStartupFailedDialog(preflightDebugServerProcess->errorString());
         delete preflightDebugServerProcess;
         preflightDebugServerProcess = nullptr;
         return false;
@@ -245,7 +347,7 @@ bool DebugSession::prepareRemoteDebugging(const InferiorStartupInfo& startupInfo
 
     QElapsedTimer timer;
     timer.start();
-    while (timer.elapsed() < 8000) {
+    while (timer.elapsed() < debugServerStartupTimeoutMs) {
         if (isDebugServerListening()) {
             qCDebug(DEBUGGERGDB) << "CK803 debug server is listening on port" << debugServerPort;
             return true;
@@ -268,7 +370,7 @@ bool DebugSession::prepareRemoteDebugging(const InferiorStartupInfo& startupInfo
     delete preflightDebugServerProcess;
     preflightDebugServerProcess = nullptr;
 
-    showBoardNotConnectedDialog();
+    showDebugServerStartupFailedDialog(debugServerOutput);
     return false;
 }
 
@@ -276,6 +378,10 @@ void DebugSession::configInferior(ILaunchConfiguration *cfg, IExecutePlugin *iex
 {
     // Read Configuration values
     KConfigGroup grp = cfg->config();
+    m_preferHardwareBreakpoints = !resolveLaunchLocalPath(
+        readLaunchPathEntry(cfg, Config::RemoteGdbConfigEntry), cfg, iexec).isEmpty();
+    appendRriseTrace(QStringLiteral("configInferior preferHardwareBreakpoints=%1")
+                         .arg(m_preferHardwareBreakpoints ? QStringLiteral("true") : QStringLiteral("false")));
     bool breakOnStart = grp.readEntry(KDevMI::Config::BreakOnStartEntry, false);
     bool displayStaticMembers = grp.readEntry(Config::StaticMembersEntry, false);
     bool asmDemangle = grp.readEntry(Config::DemangleNamesEntry, true);
@@ -333,12 +439,14 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
     qCDebug(DEBUGGERGDB) << "Executing inferior";
 
     KConfigGroup grp = cfg->config();
-    const QUrl configGdbScriptUrl = grp.readEntry(Config::RemoteGdbConfigEntry, QUrl());
-    const QUrl runShellScriptUrl = grp.readEntry(Config::RemoteGdbShellEntry, QUrl());
-    const QUrl runGdbScriptUrl = grp.readEntry(Config::RemoteGdbRunEntry, QUrl());
-    const QString configGdbScript = resolveLaunchLocalPath(configGdbScriptUrl, cfg, iexec);
-    const QString runShellScript = resolveLaunchLocalPath(runShellScriptUrl, cfg, iexec);
-    const QString runGdbScript = resolveLaunchLocalPath(runGdbScriptUrl, cfg, iexec);
+    const QString configGdbScript = resolveLaunchLocalPath(
+        readLaunchPathEntry(cfg, Config::RemoteGdbConfigEntry), cfg, iexec);
+    const QString runShellScript = resolveLaunchLocalPath(
+        readLaunchPathEntry(cfg, Config::RemoteGdbShellEntry), cfg, iexec);
+    const QString runGdbScript = resolveLaunchLocalPath(
+        readLaunchPathEntry(cfg, Config::RemoteGdbRunEntry), cfg, iexec);
+    appendRriseTrace(QStringLiteral("execInferior executable=%1 configGdbScript=%2 runGdbScript=%3")
+                         .arg(executable, configGdbScript, runGdbScript));
 
     // handle remote debug
     if (!configGdbScript.isEmpty()) {
@@ -355,7 +463,16 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
                 qCDebug(DEBUGGERGDB) << "CK803 debug server is already listening on port" << debugServerPort;
             }
         }
-        addCommand(MI::NonMI, QLatin1String("source ") + configGdbScript);
+        appendRriseTrace(QStringLiteral("queue source config script %1").arg(configGdbScript));
+        m_remoteConfigScriptInProgress = true;
+        addCommand(
+            MI::NonMI,
+            QLatin1String("source ") + configGdbScript,
+            [this](const MI::ResultRecord&) {
+                appendRriseTrace(QStringLiteral("remote config script completed"));
+                m_remoteConfigScriptInProgress = false;
+            },
+            CmdHandlesError);
     }
 
     // FIXME: have a check box option that controls remote debugging
@@ -386,10 +503,12 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
 
         addCommand(std::make_unique<SentinelCommand>(
             [this, runGdbScript]() {
+                appendRriseTrace(QStringLiteral("sentinel before initSendBreakpoints for run script"));
                 breakpointController()->initSendBreakpoints();
 
                 breakpointController()->setDeleteDuplicateBreakpoints(true);
                 qCDebug(DEBUGGERGDB) << "Running gdb script " << KShell::quoteArg(runGdbScript);
+                appendRriseTrace(QStringLiteral("queue source run script %1").arg(runGdbScript));
 
                 addCommand(
                     MI::NonMI, QLatin1String("source ") + runGdbScript,
@@ -411,6 +530,20 @@ bool DebugSession::execInferior(KDevelop::ILaunchConfiguration *cfg, IExecutePlu
             CmdMaybeStartsRunning));
     }
     return true;
+}
+
+void DebugSession::slotInferiorStopped(const MI::AsyncRecord& r)
+{
+    if (m_remoteConfigScriptInProgress) {
+        QString reason;
+        if (r.hasField(QStringLiteral("reason"))) {
+            reason = r[QStringLiteral("reason")].literal();
+        }
+        appendRriseTrace(QStringLiteral("ignore stopped during remote config reason=%1").arg(reason));
+        return;
+    }
+
+    MIDebugSession::slotInferiorStopped(r);
 }
 
 void DebugSession::loadCoreFile(const QString& coreFile)
