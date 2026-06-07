@@ -19,6 +19,7 @@
 #include <QHelpEvent>
 #include <QToolTip>
 #include <QAbstractItemView>
+#include <QColor>
 #include <QPainter>
 
 using namespace KDevelop;
@@ -45,6 +46,14 @@ static QIcon::State IconState(QStyle::State state)
 
 void ProjectModelItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt, const QModelIndex& index) const
 {
+    QStyleOptionViewItem option(opt);
+    if (option.state & QStyle::State_Selected) {
+        option.palette.setColor(QPalette::Highlight, QColor(255, 244, 190));
+        option.palette.setColor(QPalette::HighlightedText, QColor(32, 35, 39));
+        option.palette.setColor(QPalette::Active, QPalette::Text, QColor(32, 35, 39));
+        option.palette.setColor(QPalette::Inactive, QPalette::Text, QColor(32, 35, 39));
+    }
+
     // Qt5.5 HiDPI Fix part (1/2)
     // This fix is based on how Qt5.5's QItemDelegate::paint implementation deals with the same issue
     // Unfortunately, there doesn't seem to be a clean way to use the base implementation
@@ -58,16 +67,16 @@ void ProjectModelItemDelegate::paint(QPainter* painter, const QStyleOptionViewIt
         QVariant value;
         value = index.data(Qt::DecorationRole);
         if (value.isValid()) {
-            decoData = decoration(opt, value);
+            decoData = decoration(option, value);
 
             if (value.typeId() == qMetaTypeId<QIcon>()) {
                 icon = qvariant_cast<QIcon>(value);
-                mode = IconMode(opt.state);
-                state = IconState(opt.state);
-                QSize size = icon.actualSize( opt.decorationSize, mode, state );
+                mode = IconMode(option.state);
+                state = IconState(option.state);
+                QSize size = icon.actualSize( option.decorationSize, mode, state );
                 if (size.isEmpty()) {
-                    // For items with an empty icon, set size to opt.decorationSize to make them have the same indent as items with a valid icon
-                    size = opt.decorationSize;
+                    // For items with an empty icon, set size to option.decorationSize to make them have the same indent as items with a valid icon
+                    size = option.decorationSize;
                 }
                 decorationRect = QRect(QPoint(0, 0), size);
             } else {
@@ -81,36 +90,38 @@ void ProjectModelItemDelegate::paint(QPainter* painter, const QStyleOptionViewIt
 
     QRect checkRect; //unused in practice
 
-    QRect spaceLeft = opt.rect;
+    QRect spaceLeft = option.rect;
     spaceLeft.setLeft(decorationRect.right());
     QString displayData = index.data(Qt::DisplayRole).toString();
-    QRect displayRect = textRectangle(painter, spaceLeft, opt.font, displayData);
+    QRect displayRect = textRectangle(painter, spaceLeft, option.font, displayData);
     displayRect.setLeft(spaceLeft.left());
 
-    QRect branchNameRect(displayRect.topRight(), opt.rect.bottomRight());
+    QRect branchNameRect(displayRect.topRight(), option.rect.bottomRight());
 
-    doLayout(opt, &checkRect, &decorationRect, &displayRect, false);
+    doLayout(option, &checkRect, &decorationRect, &displayRect, false);
     branchNameRect.setLeft(branchNameRect.left() + displayRect.left());
     branchNameRect.setTop(displayRect.top());
 
-    drawStyledBackground(painter, opt);
+    drawStyledBackground(painter, option);
 //     drawCheck(painter, opt, checkRect, checkState);
 
     // Qt5.5 HiDPI Fix part (2/2)
     // use the QIcon from above if possible
     if (!icon.isNull()) {
-        icon.paint(painter, decorationRect, opt.decorationAlignment, mode, state );
+        icon.paint(painter, decorationRect, option.decorationAlignment, mode, state );
     } else {
-        drawDecoration(painter, opt, decorationRect, decoData);
+        drawDecoration(painter, option, decorationRect, decoData);
     }
 
-    drawDisplay(painter, opt, displayRect, displayData);
+    drawDisplay(painter, option, displayRect, displayData);
 
     /// FIXME: this can apparently trigger a nested eventloop, see
     ///        https://bugs.kde.org/show_bug.cgi?id=355099
     QString branchNameData = index.data(VcsOverlayProxyModel::VcsStatusRole).toString();
-    drawBranchName(painter, opt, branchNameRect, branchNameData);
-    drawFocus(painter, opt, displayRect);
+    drawBranchName(painter, option, branchNameRect, branchNameData);
+    if (!(option.state & QStyle::State_Selected)) {
+        drawFocus(painter, option, displayRect);
+    }
 
 }
 
@@ -129,6 +140,13 @@ void ProjectModelItemDelegate::drawBranchName(QPainter* painter, const QStyleOpt
 
 void ProjectModelItemDelegate::drawStyledBackground(QPainter* painter, const QStyleOptionViewItem& option) const
 {
+    if (option.state & QStyle::State_Selected) {
+        painter->save();
+        painter->fillRect(option.rect, QColor(255, 244, 190));
+        painter->restore();
+        return;
+    }
+
     QStyleOptionViewItem opt(option);
     QStyle *style = opt.widget->style();
     style->drawPrimitive(QStyle::PE_PanelItemViewItem, &option, painter, opt.widget);
