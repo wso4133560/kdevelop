@@ -1,0 +1,10 @@
+{
+    "KPlugin": {
+        "Category": "Utilities",
+        "Description": "Adds a dockable THU compiler frontend to RRISE.",
+        "Icon": "run-build",
+        "Name": "THU Compiler"
+    },
+    "X-KDevelop-Category": "Global",
+    "X-KDevelop-Mode": "GUI"
+}
