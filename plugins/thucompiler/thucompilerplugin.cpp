@@ -35,6 +35,7 @@
 #include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QStackedWidget>
@@ -44,6 +45,8 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+#include <utility>
 
 class ThuCompilerPlugin;
 
@@ -406,6 +409,13 @@ private:
         return QDir::cleanPath(QDir::fromNativeSeparators(text));
     }
 
+    static QString quoteCmdArg(const QString& value)
+    {
+        QString escaped = QDir::toNativeSeparators(value);
+        escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+        return QLatin1Char('"') + escaped + QLatin1Char('"');
+    }
+
 private Q_SLOTS:
     void addFiles()
     {
@@ -548,17 +558,46 @@ private Q_SLOTS:
                 appendOutput(QStringLiteral("[ERROR] THC 模式需要至少添加一个 .c 文件。\n"));
                 return;
             }
-            args = {QStringLiteral("/c"), QStringLiteral("call"), compileBatPath(), QStringLiteral("-THC"),
-                    m_optCombo->currentData().toString(), files.join(QLatin1Char(';'))};
+            const QString opt = m_optCombo->currentData().toString();
+            m_compileScriptPath = QDir(outputDir).filePath(QStringLiteral(".rrise_thu_compile.cmd"));
+
+            QStringList scriptLines;
+            scriptLines << QStringLiteral("@echo off");
+            scriptLines << QStringLiteral("setlocal");
+            for (const QString& file : std::as_const(files)) {
+                scriptLines << QStringLiteral("call %1 -THC %2 %3").arg(quoteCmdArg(compileBatPath()), opt, quoteCmdArg(file));
+                scriptLines << QStringLiteral("if errorlevel 1 exit /b %errorlevel%");
+            }
+            scriptLines << QStringLiteral("exit /b 0");
+
+            QFile scriptFile(m_compileScriptPath);
+            if (!scriptFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+                appendOutput(QStringLiteral("[ERROR] 鏃犳硶鍒涘缓 THC 缂栬瘧鑴氭湰锛?1\n").arg(scriptFile.errorString()));
+                return;
+            }
+            scriptFile.write(scriptLines.join(QStringLiteral("\r\n")).toLocal8Bit());
+            scriptFile.write("\r\n");
+            scriptFile.close();
+
+            args = {QStringLiteral("/d"), QStringLiteral("/c"), QDir::toNativeSeparators(m_compileScriptPath)};
         }
 
         appendOutput(QStringLiteral("\n[INFO] 编译器：%1\n").arg(QDir::toNativeSeparators(compileBatPath())));
         appendOutput(QStringLiteral("[INFO] 工作目录：%1\n").arg(QDir::toNativeSeparators(outputDir)));
         appendOutput(QStringLiteral("[INFO] 命令：cmd.exe %1\n").arg(args.join(QLatin1Char(' '))));
 
+        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        const QString llvmBin = QDir(m_compilerRoot).filePath(QStringLiteral("llvm/bin"));
+        if (QFileInfo(llvmBin).isDir()) {
+            const QString path = environment.value(QStringLiteral("PATH"));
+            environment.insert(QStringLiteral("PATH"), QDir::toNativeSeparators(llvmBin) + QLatin1Char(';') + path);
+            appendOutput(QStringLiteral("[INFO] LLVM tools: %1\n").arg(QDir::toNativeSeparators(llvmBin)));
+        }
+
         m_process->setProgram(QStringLiteral("cmd.exe"));
         m_process->setArguments(args);
         m_process->setWorkingDirectory(outputDir);
+        m_process->setProcessEnvironment(environment);
         m_process->setProcessChannelMode(QProcess::MergedChannels);
         m_compileButton->setEnabled(false);
         m_compileButton->setText(QStringLiteral("编译中..."));
@@ -574,6 +613,7 @@ private Q_SLOTS:
     {
         const bool ok = exitStatus == QProcess::NormalExit && exitCode == 0;
         appendOutput(ok ? QStringLiteral("[INFO] 编译成功。\n") : QStringLiteral("[ERROR] 编译失败，退出码：%1\n").arg(exitCode));
+        removeCompileScript();
         setStatus(ok);
         m_compileButton->setEnabled(true);
         m_compileButton->setText(QStringLiteral("开始编译"));
@@ -586,6 +626,7 @@ private Q_SLOTS:
         appendOutput(QStringLiteral("[ERROR] 无法启动编译进程：%1\n").arg(m_process->errorString()));
         m_compileButton->setEnabled(true);
         m_compileButton->setText(QStringLiteral("开始编译"));
+        removeCompileScript();
         setStatus(false);
     }
 
@@ -594,6 +635,14 @@ private Q_SLOTS:
         const QString outputDir = normalizedOutputDirectory();
         QDir().mkpath(outputDir);
         QProcess::startDetached(QStringLiteral("explorer.exe"), {QDir::toNativeSeparators(outputDir)});
+    }
+
+    void removeCompileScript()
+    {
+        if (!m_compileScriptPath.isEmpty()) {
+            QFile::remove(m_compileScriptPath);
+            m_compileScriptPath.clear();
+        }
     }
 
     void toggleFullScreen()
@@ -725,6 +774,7 @@ private:
     QDialog* m_fullscreenDialog = nullptr;
     QString m_compilerRoot;
     QString m_outputDirectory;
+    QString m_compileScriptPath;
 };
 
 class ThuCompilerPlugin : public KDevelop::IPlugin
