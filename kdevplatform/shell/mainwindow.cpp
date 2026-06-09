@@ -10,14 +10,20 @@
 #include "mainwindow.h"
 #include "mainwindow_p.h"
 
+#include <QApplication>
 #include <QDBusConnection>
+#include <QDockWidget>
 #include <QDomElement>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QPalette>
+#include <QStatusBar>
 #include <QTimer>
+#include <QToolBar>
+#include <QToolButton>
 #include <QUrl>
 
 #include <KActionCollection>
@@ -65,6 +71,125 @@ namespace {
 QColor defaultColor(const QPalette& palette)
 {
     return palette.windowText().color();
+}
+
+bool rriseIsDarkWindowPalette(const QPalette& palette)
+{
+    return palette.color(QPalette::Window).lightness() < 128;
+}
+
+bool rriseIsDarkPalette()
+{
+    return rriseIsDarkWindowPalette(QApplication::palette());
+}
+
+void rriseSetPaletteColor(QPalette& palette, QPalette::ColorRole role, const QColor& active, const QColor& disabled)
+{
+    palette.setColor(QPalette::Active, role, active);
+    palette.setColor(QPalette::Inactive, role, active);
+    palette.setColor(QPalette::Disabled, role, disabled);
+}
+
+QString rriseDarkMenuStyleSheet()
+{
+    return QStringLiteral(
+        "QMenu {"
+        "background: #252526;"
+        "color: #d4d4d4;"
+        "border: 1px solid #3c3c3c;"
+        "}"
+        "QMenu::item {"
+        "color: #d4d4d4;"
+        "padding: 5px 26px 5px 24px;"
+        "}"
+        "QMenu::item:selected {"
+        "background: #264f78;"
+        "color: #ffffff;"
+        "}"
+        "QMenu::item:disabled {"
+        "color: #858585;"
+        "}"
+        "QMenu::separator {"
+        "height: 1px;"
+        "background: #3c3c3c;"
+        "margin: 4px 8px;"
+        "}");
+}
+
+QString rriseDarkMenuBarStyleSheet()
+{
+    return QStringLiteral(
+        "QMenuBar { color: #d4d4d4; }"
+        "QMenuBar::item { color: #d4d4d4; background: transparent; padding: 4px 8px; }"
+        "QMenuBar::item:selected, QMenuBar::item:pressed { color: #ffffff; background: #2a2d2e; }"
+        "QMenuBar::item:disabled { color: #858585; }");
+}
+
+QString rriseDarkToolBarStyleSheet()
+{
+    return QStringLiteral(
+        "QToolBar { color: #d4d4d4; }"
+        "QToolButton { color: #d4d4d4; }"
+        "QToolButton:disabled { color: #858585; }"
+        "QToolButton::menu-indicator { color: #d4d4d4; }");
+}
+
+QString rriseDarkToolButtonStyleSheet()
+{
+    return QStringLiteral(
+        "QToolButton { color: #d4d4d4; }"
+        "QToolButton:disabled { color: #858585; }"
+        "QToolButton::menu-indicator { color: #d4d4d4; }");
+}
+
+void rriseApplyReadableDarkTextPalette(QWidget* widget, bool dark, const QString& darkStyleSheet = QString{})
+{
+    if (!widget) {
+        return;
+    }
+
+    if (!dark) {
+        widget->setPalette(QApplication::palette(widget));
+        if (!widget->styleSheet().isEmpty()) {
+            widget->setStyleSheet(QString{});
+        }
+        return;
+    }
+
+    QPalette palette = widget->palette();
+    const QColor textColor(QStringLiteral("#d4d4d4"));
+    const QColor disabledTextColor(QStringLiteral("#858585"));
+    const QColor backgroundColor(QStringLiteral("#252526"));
+    const QColor baseColor(QStringLiteral("#1e1e1e"));
+    const QColor highlightColor(QStringLiteral("#264f78"));
+    rriseSetPaletteColor(palette, QPalette::WindowText, textColor, disabledTextColor);
+    rriseSetPaletteColor(palette, QPalette::Text, textColor, disabledTextColor);
+    rriseSetPaletteColor(palette, QPalette::ButtonText, textColor, disabledTextColor);
+    rriseSetPaletteColor(palette, QPalette::ToolTipText, QColor(QStringLiteral("#ffffff")), disabledTextColor);
+    rriseSetPaletteColor(palette, QPalette::Button, backgroundColor, backgroundColor);
+    rriseSetPaletteColor(palette, QPalette::Window, backgroundColor, backgroundColor);
+    rriseSetPaletteColor(palette, QPalette::Base, baseColor, baseColor);
+    rriseSetPaletteColor(palette, QPalette::HighlightedText, QColor(QStringLiteral("#ffffff")), disabledTextColor);
+    rriseSetPaletteColor(palette, QPalette::Highlight, highlightColor, highlightColor);
+    palette.setColor(QPalette::PlaceholderText, disabledTextColor);
+    widget->setPalette(palette);
+    if (widget->styleSheet() != darkStyleSheet) {
+        widget->setStyleSheet(darkStyleSheet);
+    }
+}
+
+void rriseApplyReadableDarkMenu(QMenu* menu)
+{
+    if (!menu) {
+        return;
+    }
+
+    rriseApplyReadableDarkTextPalette(menu, rriseIsDarkPalette(), rriseDarkMenuStyleSheet());
+    for (QAction* action : menu->actions()) {
+        if (QMenu* subMenu = action->menu()) {
+            rriseApplyReadableDarkMenu(subMenu);
+        }
+    }
 }
 
 QColor colorForDocument(const QUrl& url, const QPalette& palette, const QColor& defaultColor)
@@ -509,11 +634,58 @@ void MainWindow::localizeTopLevelMenus()
         if (!menu->property("_rrise_menu_localized").toBool()) {
             menu->setProperty("_rrise_menu_localized", true);
             connect(menu, &QMenu::aboutToShow, menu, [menu] {
+                rriseApplyReadableDarkMenu(menu);
                 localizeMenu(menu);
             });
         }
+        rriseApplyReadableDarkMenu(menu);
         localizeMenu(menu);
     }
+}
+
+void MainWindow::applyRriseWindowThemeStyleSheet()
+{
+    if (m_rriseThemeStyleSheetApplying) {
+        return;
+    }
+
+    m_rriseThemeStyleSheetApplying = true;
+    const bool dark = rriseIsDarkPalette();
+    rriseApplyReadableDarkTextPalette(this, dark);
+    rriseApplyReadableDarkTextPalette(menuBar(), dark, rriseDarkMenuBarStyleSheet());
+    rriseApplyReadableDarkTextPalette(statusBar(), dark);
+    for (QAction* action : menuBar()->actions()) {
+        rriseApplyReadableDarkMenu(action->menu());
+    }
+    for (auto* toolbar : findChildren<QToolBar*>()) {
+        rriseApplyReadableDarkTextPalette(toolbar, dark, rriseDarkToolBarStyleSheet());
+    }
+    for (auto* dock : findChildren<QDockWidget*>()) {
+        rriseApplyReadableDarkTextPalette(dock, dark);
+    }
+    for (auto* button : findChildren<QToolButton*>()) {
+        rriseApplyReadableDarkTextPalette(button, dark, rriseDarkToolButtonStyleSheet());
+        if (QMenu* menu = button->menu()) {
+            rriseApplyReadableDarkMenu(menu);
+        }
+    }
+    if (!styleSheet().isEmpty()) {
+        setStyleSheet(QString{});
+    }
+    m_rriseThemeStyleSheetApplying = false;
+}
+
+void MainWindow::scheduleRriseWindowThemeStyleSheetUpdate()
+{
+    if (m_rriseThemeStyleSheetUpdatePending) {
+        return;
+    }
+
+    m_rriseThemeStyleSheetUpdatePending = true;
+    QTimer::singleShot(0, this, [this] {
+        m_rriseThemeStyleSheetUpdatePending = false;
+        applyRriseWindowThemeStyleSheet();
+    });
 }
 
 void MainWindow::loadCornerSettings()
@@ -558,6 +730,7 @@ MainWindow::MainWindow( Sublime::Controller *parent, Qt::WindowFlags flags )
     }
 
     menuBar()->setCornerWidget(new AreaDisplay(this), Qt::TopRightCorner);
+    scheduleRriseWindowThemeStyleSheetUpdate();
 }
 
 MainWindow::~ MainWindow()
@@ -634,8 +807,15 @@ QAction* MainWindow::createCustomElement(QWidget* parent, int index, const QDomE
 
 bool KDevelop::MainWindow::event( QEvent* ev )
 {
-    if ( ev->type() == QEvent::PaletteChange )
+    if (ev->type() == QEvent::PaletteChange || ev->type() == QEvent::ApplicationPaletteChange) {
         updateAllTabColors();
+        scheduleRriseWindowThemeStyleSheetUpdate();
+    } else if (ev->type() == QEvent::Show
+               || ev->type() == QEvent::ChildAdded
+               || ev->type() == QEvent::LayoutRequest
+               || ev->type() == QEvent::PolishRequest) {
+        scheduleRriseWindowThemeStyleSheetUpdate();
+    }
     return Sublime::MainWindow::event(ev);
 }
 

@@ -15,12 +15,14 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QPalette>
 #include <QPointer>
 #include <QStackedWidget>
 #include <QStyleFactory>
 #include <QStyleOptionTabBarBase>
 #include <QStylePainter>
 #include <QTabBar>
+#include <QTimer>
 #include <QToolButton>
 #include <QWindow>
 
@@ -83,6 +85,40 @@ ActionInsertionPoint findActionInsertionPoint(const QList<QAction*>& actions, co
     return ret;
 }
 
+bool isDarkPalette(const QPalette& palette)
+{
+    return palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+}
+
+QString containerTabBarStyleSheet(const QPalette& palette)
+{
+    if (isDarkPalette(palette)) {
+        return QStringLiteral(
+            "QTabBar::tab {"
+            "background: #2d2d2d;"
+            "color: #d4d4d4;"
+            "border: 1px solid #3c3c3c;"
+            "border-bottom: 0;"
+            "padding: 5px 10px;"
+            "}"
+            "QTabBar::tab:selected {"
+            "background: #1e1e1e;"
+            "color: #ffffff;"
+            "border-top: 2px solid #007acc;"
+            "}"
+            "QTabBar::tab:hover:!selected {"
+            "background: #333333;"
+            "color: #ffffff;"
+            "}");
+    }
+
+    return QStringLiteral(
+        "QTabBar::tab:selected {"
+        "background: #fff3b0;"
+        "color: #1f2328;"
+        "}");
+}
+
 } // namespace
 
 namespace Sublime {
@@ -109,14 +145,14 @@ public:
         setDocumentMode(true);
         setUsesScrollButtons(true);
         setElideMode(Qt::ElideNone);
-        setStyleSheet(QStringLiteral(
-            "QTabBar::tab:selected {"
-            "background: #fff3b0;"
-            "color: #1f2328;"
-            "}"));
+        scheduleThemeStyleSheetUpdate();
     }
 
     bool event(QEvent* ev) override {
+        if (ev->type() == QEvent::PaletteChange || ev->type() == QEvent::ApplicationPaletteChange) {
+            scheduleThemeStyleSheetUpdate();
+        }
+
         if(ev->type() == QEvent::ToolTip)
         {
             ev->accept();
@@ -161,7 +197,36 @@ Q_SIGNALS:
     void newTabRequested();
 
 private:
+    void scheduleThemeStyleSheetUpdate()
+    {
+        if (m_themeStyleSheetUpdatePending) {
+            return;
+        }
+
+        m_themeStyleSheetUpdatePending = true;
+        QTimer::singleShot(0, this, [this] {
+            m_themeStyleSheetUpdatePending = false;
+            applyThemeStyleSheet();
+        });
+    }
+
+    void applyThemeStyleSheet()
+    {
+        if (m_themeStyleSheetApplying) {
+            return;
+        }
+
+        m_themeStyleSheetApplying = true;
+        const QString styleSheet = containerTabBarStyleSheet(QApplication::palette());
+        if (this->styleSheet() != styleSheet) {
+            setStyleSheet(styleSheet);
+        }
+        m_themeStyleSheetApplying = false;
+    }
+
     Container* const m_container;
+    bool m_themeStyleSheetUpdatePending = false;
+    bool m_themeStyleSheetApplying = false;
 };
 
 #ifdef Q_OS_MACOS

@@ -8,6 +8,7 @@
 
 #include <QAbstractProxyModel>
 #include <QAbstractTextDocumentLayout>
+#include <QPalette>
 #include <QPainter>
 #include "expandingwidgetmodel.h"
 
@@ -15,6 +16,13 @@
 #include <util/widgetcolorizer.h>
 
 using namespace KDevelop;
+
+namespace {
+bool isDarkPalette(const QPalette& palette)
+{
+    return palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+}
+}
 
 ExpandingTree::ExpandingTree(QWidget* parent) : QTreeView(parent)
 {
@@ -69,7 +77,9 @@ void ExpandingTree::drawBranches(QPainter* painter, const QRect& rect, const QMo
 {
     const auto& path = index.data(ProjectPathRole).value<Path>();
     if (path.isValid()) {
-        const auto color = WidgetColorizer::colorForId(qHash(path), palette(), true);
+        const auto color = isDarkPalette(palette())
+            ? QColor(QStringLiteral("#252526"))
+            : WidgetColorizer::colorForId(qHash(path), palette(), true);
         WidgetColorizer::drawBranches(this, painter, rect, index, color);
     }
     QTreeView::drawBranches(painter, rect, index);

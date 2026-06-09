@@ -14,6 +14,7 @@
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QMenu>
+#include <QPalette>
 #include <QSortFilterProxyModel>
 
 #include <KLocalizedString>
@@ -353,7 +354,8 @@ void KDevDocumentView::drawBranches(QPainter* painter, const QRect& rect, const 
         const auto url = index.data(KDevDocumentItem::UrlRole).toUrl();
         const auto project = ICore::self()->projectController()->findProjectForUrl(url);
         if (project) {
-            const QColor color = WidgetColorizer::colorForId(qHash(project->path()), palette(), true);
+            const bool dark = palette().color(QPalette::Window).lightness() < palette().color(QPalette::WindowText).lightness();
+            const QColor color = dark ? QColor(QStringLiteral("#252526")) : WidgetColorizer::colorForId(qHash(project->path()), palette(), true);
             WidgetColorizer::drawBranches(this, painter, rect, index, color);
         }
     }

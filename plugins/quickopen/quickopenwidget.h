@@ -17,6 +17,7 @@
 class QuickOpenModel;
 
 class QAbstractProxyModel;
+class QEvent;
 class QLineEdit;
 
 /// Will delete itself once the dialog is closed, so use QPointer when referencing it permanently
@@ -61,15 +62,19 @@ private Q_SLOTS:
     void applyFilter();
 private:
     void showEvent(QShowEvent*) override;
+    bool event(QEvent*) override;
 
     bool eventFilter (QObject* watched, QEvent* event) override;
 
     void avoidMenuAltFocus();
+    void applyThemeStyleSheet();
 
     QuickOpenModel* m_model;
     QAbstractProxyModel* m_proxy = nullptr;
     bool m_sortingEnabled = false;
     bool m_expandedTemporary, m_hadNoCommandSinceAlt;
+    bool m_themeStyleSheetUpdatePending = false;
+    bool m_themeStyleSheetApplying = false;
     QTime m_altDownTime;
     QString m_preselectedText;
     QTimer m_filterTimer;

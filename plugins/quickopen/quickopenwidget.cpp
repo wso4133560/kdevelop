@@ -14,7 +14,10 @@
 #include <icore.h>
 #include <iuicontroller.h>
 
+#include <QApplication>
 #include <QDialog>
+#include <QEvent>
+#include <QPalette>
 #include <QSortFilterProxyModel>
 #include <QIdentityProxyModel>
 #include <QMenuBar>
@@ -25,6 +28,69 @@
 #include <KTextEditor/CodeCompletionModel>
 
 using namespace KDevelop;
+
+namespace {
+bool isDarkPalette(const QPalette& palette)
+{
+    return palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+}
+
+QString quickOpenDarkStyleSheet()
+{
+    return QStringLiteral(
+        "#QuickOpenWidget {"
+        "background: #1e1e1e;"
+        "color: #d4d4d4;"
+        "border: 1px solid #3c3c3c;"
+        "}"
+        "#QuickOpenWidget QLabel {"
+        "color: #d4d4d4;"
+        "}"
+        "ExpandingTree#list {"
+        "background: #111315;"
+        "color: #d4d4d4;"
+        "selection-background-color: #264f78;"
+        "selection-color: #ffffff;"
+        "border: 0;"
+        "outline: 0;"
+        "}"
+        "ExpandingTree#list::item {"
+        "background: #111315;"
+        "color: #d4d4d4;"
+        "}"
+        "ExpandingTree#list::item:selected {"
+        "background: #264f78;"
+        "color: #ffffff;"
+        "}"
+        "ExpandingTree#list::item:hover:!selected {"
+        "background: #2a2d2e;"
+        "}"
+        "QLineEdit#searchLine {"
+        "background: #1b1d1e;"
+        "color: #d4d4d4;"
+        "selection-background-color: #264f78;"
+        "selection-color: #ffffff;"
+        "border: 1px solid #3c3c3c;"
+        "border-radius: 3px;"
+        "padding: 3px 6px;"
+        "}"
+        "QPushButton {"
+        "background: #3c3c3c;"
+        "color: #d4d4d4;"
+        "border: 1px solid #555555;"
+        "border-radius: 3px;"
+        "padding: 4px 10px;"
+        "}"
+        "QPushButton:hover {"
+        "background: #4b4b4b;"
+        "border-color: #6b6b6b;"
+        "}"
+        "QPushButton:pressed {"
+        "background: #264f78;"
+        "color: #ffffff;"
+        "}");
+}
+}
 
 class QuickOpenDelegate
     : public ExpandingDelegate
@@ -53,6 +119,7 @@ QuickOpenWidget::QuickOpenWidget(QuickOpenModel* model, const QStringList& initi
     connect(&m_filterTimer, &QTimer::timeout, this, &QuickOpenWidget::applyFilter);
 
     ui.setupUi(this);
+    applyThemeStyleSheet();
     ui.list->header()->hide();
     ui.list->setRootIsDecorated(false);
     ui.list->setVerticalScrollMode(QAbstractItemView::ScrollPerItem);
@@ -123,6 +190,34 @@ QuickOpenWidget::QuickOpenWidget(QuickOpenModel* model, const QStringList& initi
 
 // no need to call this, it's done by updateProviders already
 //   m_model->restart();
+}
+
+bool QuickOpenWidget::event(QEvent* event)
+{
+    if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
+        if (!m_themeStyleSheetUpdatePending) {
+            m_themeStyleSheetUpdatePending = true;
+            QTimer::singleShot(0, this, [this] {
+                m_themeStyleSheetUpdatePending = false;
+                applyThemeStyleSheet();
+            });
+        }
+    }
+    return QMenu::event(event);
+}
+
+void QuickOpenWidget::applyThemeStyleSheet()
+{
+    if (m_themeStyleSheetApplying) {
+        return;
+    }
+
+    m_themeStyleSheetApplying = true;
+    const QString styleSheet = isDarkPalette(QApplication::palette()) ? quickOpenDarkStyleSheet() : QString{};
+    if (this->styleSheet() != styleSheet) {
+        setStyleSheet(styleSheet);
+    }
+    m_themeStyleSheetApplying = false;
 }
 
 void QuickOpenWidget::showStandardButtons(bool show)

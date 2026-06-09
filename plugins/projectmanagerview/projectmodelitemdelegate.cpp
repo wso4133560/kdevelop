@@ -44,14 +44,31 @@ static QIcon::State IconState(QStyle::State state)
     return  (state & QStyle::State_Open) ? QIcon::On : QIcon::Off;
 }
 
+static bool IsDarkPalette(const QPalette& palette)
+{
+    return palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+}
+
+static QColor SelectedBackground(const QPalette& palette)
+{
+    return IsDarkPalette(palette) ? QColor(38, 79, 120) : QColor(255, 244, 190);
+}
+
+static QColor SelectedText(const QPalette& palette)
+{
+    return IsDarkPalette(palette) ? QColor(255, 255, 255) : QColor(32, 35, 39);
+}
+
 void ProjectModelItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt, const QModelIndex& index) const
 {
     QStyleOptionViewItem option(opt);
     if (option.state & QStyle::State_Selected) {
-        option.palette.setColor(QPalette::Highlight, QColor(255, 244, 190));
-        option.palette.setColor(QPalette::HighlightedText, QColor(32, 35, 39));
-        option.palette.setColor(QPalette::Active, QPalette::Text, QColor(32, 35, 39));
-        option.palette.setColor(QPalette::Inactive, QPalette::Text, QColor(32, 35, 39));
+        const QColor background = SelectedBackground(option.palette);
+        const QColor text = SelectedText(option.palette);
+        option.palette.setColor(QPalette::Highlight, background);
+        option.palette.setColor(QPalette::HighlightedText, text);
+        option.palette.setColor(QPalette::Active, QPalette::Text, text);
+        option.palette.setColor(QPalette::Inactive, QPalette::Text, text);
     }
 
     // Qt5.5 HiDPI Fix part (1/2)
@@ -142,7 +159,7 @@ void ProjectModelItemDelegate::drawStyledBackground(QPainter* painter, const QSt
 {
     if (option.state & QStyle::State_Selected) {
         painter->save();
-        painter->fillRect(option.rect, QColor(255, 244, 190));
+        painter->fillRect(option.rect, SelectedBackground(option.palette));
         painter->restore();
         return;
     }

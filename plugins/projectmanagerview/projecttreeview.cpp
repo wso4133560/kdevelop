@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QHeaderView>
 #include <QMenu>
+#include <QPalette>
 #include <QPainter>
 
 #include <KConfigGroup>
@@ -459,7 +460,8 @@ void ProjectTreeView::drawBranches(QPainter* painter, const QRect& rect, const Q
 {
     if (WidgetColorizer::colorizeByProject()) {
         const auto projectPath = index.data(ProjectModel::ProjectRole).value<IProject *>()->path();
-        const QColor color = WidgetColorizer::colorForId(qHash(projectPath), palette(), true);
+        const bool dark = palette().color(QPalette::Window).lightness() < palette().color(QPalette::WindowText).lightness();
+        const QColor color = dark ? QColor(QStringLiteral("#252526")) : WidgetColorizer::colorForId(qHash(projectPath), palette(), true);
         WidgetColorizer::drawBranches(this, painter, rect, index, color);
     }
 

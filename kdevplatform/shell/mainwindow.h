@@ -98,9 +98,13 @@ private Q_SLOTS:
 private:
     void loadCornerSettings();
     void localizeTopLevelMenus();
+    void applyRriseWindowThemeStyleSheet();
+    void scheduleRriseWindowThemeStyleSheetUpdate();
 
 private:
     MainWindowPrivate* d_ptr;
+    bool m_rriseThemeStyleSheetUpdatePending = false;
+    bool m_rriseThemeStyleSheetApplying = false;
     Q_DECLARE_PRIVATE(MainWindow)
     friend class MainWindowPrivate;
 };

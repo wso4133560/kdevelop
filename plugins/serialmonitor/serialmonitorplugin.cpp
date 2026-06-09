@@ -17,12 +17,14 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QDir>
+#include <QEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QList>
 #include <QMutex>
+#include <QPalette>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -200,6 +202,9 @@ public:
         , m_statusLabel(new QLabel(this))
         , m_output(new QPlainTextEdit(this))
     {
+        setObjectName(QStringLiteral("serialMonitorView"));
+        applyThemeStyleSheet();
+
         m_portCombo->setEditable(true);
         m_baudCombo->setEditable(true);
         for (const int baud : {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600}) {
@@ -244,6 +249,16 @@ public:
         s_views.removeAll(this);
     }
 
+protected:
+    void changeEvent(QEvent* event) override
+    {
+        QWidget::changeEvent(event);
+        if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::PaletteChange) {
+            scheduleThemeStyleSheetUpdate();
+        }
+    }
+
+public:
     static void autoOpenSavedPort()
     {
         if (s_portOpen || s_opening) {
@@ -418,6 +433,103 @@ private Q_SLOTS:
     }
 
 private:
+    void applyThemeStyleSheet()
+    {
+        if (m_themeStyleSheetApplying) {
+            return;
+        }
+
+        m_themeStyleSheetApplying = true;
+        const QPalette palette = QApplication::palette();
+        const bool dark = palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+        if (!dark) {
+            setStyleSheet(QString{});
+            m_themeStyleSheetApplying = false;
+            return;
+        }
+
+        setStyleSheet(QStringLiteral(
+            "#serialMonitorView {"
+            "background: #1e1e1e;"
+            "color: #d4d4d4;"
+            "}"
+            "#serialMonitorView QLabel {"
+            "color: #d4d4d4;"
+            "}"
+            "#serialMonitorView QComboBox {"
+            "background: #2d2d30;"
+            "color: #d4d4d4;"
+            "selection-background-color: #264f78;"
+            "selection-color: #ffffff;"
+            "border: 1px solid #555555;"
+            "border-radius: 3px;"
+            "padding: 3px 8px;"
+            "min-height: 22px;"
+            "}"
+            "#serialMonitorView QComboBox:disabled {"
+            "background: #252526;"
+            "color: #858585;"
+            "border-color: #3c3c3c;"
+            "}"
+            "#serialMonitorView QComboBox QAbstractItemView {"
+            "background: #252526;"
+            "color: #d4d4d4;"
+            "selection-background-color: #264f78;"
+            "selection-color: #ffffff;"
+            "border: 1px solid #3c3c3c;"
+            "}"
+            "#serialMonitorView QLineEdit {"
+            "background: #2d2d30;"
+            "color: #d4d4d4;"
+            "selection-background-color: #264f78;"
+            "selection-color: #ffffff;"
+            "border: 0;"
+            "}"
+            "#serialMonitorView QPushButton {"
+            "background: #3c3c3c;"
+            "color: #d4d4d4;"
+            "border: 1px solid #555555;"
+            "border-radius: 3px;"
+            "padding: 4px 12px;"
+            "min-height: 22px;"
+            "}"
+            "#serialMonitorView QPushButton:hover {"
+            "background: #4b4b4b;"
+            "border-color: #6b6b6b;"
+            "}"
+            "#serialMonitorView QPushButton:pressed {"
+            "background: #264f78;"
+            "color: #ffffff;"
+            "}"
+            "#serialMonitorView QPushButton:disabled {"
+            "background: #2d2d30;"
+            "color: #6a6a6a;"
+            "border-color: #3c3c3c;"
+            "}"
+            "#serialMonitorView QPlainTextEdit {"
+            "background: #111315;"
+            "color: #d4d4d4;"
+            "selection-background-color: #264f78;"
+            "selection-color: #ffffff;"
+            "border: 1px solid #3c3c3c;"
+            "border-radius: 3px;"
+            "}"));
+        m_themeStyleSheetApplying = false;
+    }
+
+    void scheduleThemeStyleSheetUpdate()
+    {
+        if (m_themeStyleSheetUpdatePending) {
+            return;
+        }
+
+        m_themeStyleSheetUpdatePending = true;
+        QTimer::singleShot(0, this, [this] {
+            m_themeStyleSheetUpdatePending = false;
+            applyThemeStyleSheet();
+        });
+    }
+
     static QList<SerialPortInfo> availablePorts()
     {
         QList<SerialPortInfo> ports = setupApiPorts();
@@ -707,6 +819,8 @@ private:
     QPushButton* const m_saveLogButton;
     QLabel* const m_statusLabel;
     QPlainTextEdit* const m_output;
+    bool m_themeStyleSheetUpdatePending = false;
+    bool m_themeStyleSheetApplying = false;
 
     static QList<SerialMonitorView*> s_views;
     static SerialReader* s_reader;

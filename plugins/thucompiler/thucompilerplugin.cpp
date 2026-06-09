@@ -23,6 +23,7 @@
 #include <QDateTime>
 #include <QDialog>
 #include <QDir>
+#include <QEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -178,25 +179,20 @@ public:
         }
     }
 
+protected:
+    void changeEvent(QEvent* event) override
+    {
+        QWidget::changeEvent(event);
+        if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::PaletteChange) {
+            scheduleThemeStyleSheetUpdate();
+        }
+    }
+
 private:
     void buildUi()
     {
         setObjectName(QStringLiteral("thuCompilerView"));
-        setStyleSheet(QStringLiteral(
-            "#thuCompilerView { background: #ffffff; }"
-            "#modeCard { border: 1px solid #d9dde7; border-radius: 8px; background: #ffffff; }"
-            "#modeCard:hover { border-color: #6d3cc8; background: #fbf8ff; }"
-            "#modeTitle { font-weight: 600; }"
-            "#modeGlyph { color: #6d3cc8; font-size: 42px; font-weight: 600; }"
-            "#sidePanel { border-left: 1px solid #d9dde7; background: #fbfbfd; }"
-            "#outputTitle { font-weight: 600; }"
-            "#successBanner { background: #eef8ee; border: 1px solid #cae8ca; color: #2b8a3e; border-radius: 6px; padding: 8px; }"
-            "QPushButton { min-height: 26px; }"
-            "QPushButton#primaryButton { background: #673ab7; color: white; border: 0; border-radius: 4px; padding: 8px 16px; }"
-            "QPushButton#primaryButton:disabled { background: #b8acd2; }"
-            "QListWidget { border: 1px solid #d9dde7; border-radius: 6px; }"
-            "QListWidget::item:selected { background: #f6edbd; color: #222; }"
-            "QPlainTextEdit { border: 1px solid #d9dde7; border-radius: 6px; }"));
+        applyThemeStyleSheet();
 
         auto* fftCard = new ModeCard(QStringLiteral("FFT 模式 (-FFT)"), QStringLiteral("~"), QStringLiteral("编译 FFT 相关电路"), QStringLiteral("输入 pot_num"), this);
         auto* ifftCard = new ModeCard(QStringLiteral("IFFT 模式 (-IFFT)"), QStringLiteral("≈"), QStringLiteral("编译 IFFT 相关电路"), QStringLiteral("输入 pot_num"), this);
@@ -306,6 +302,78 @@ private:
         m_rootLayout = new QHBoxLayout(this);
         m_rootLayout->setContentsMargins(12, 12, 12, 12);
         m_rootLayout->addWidget(m_contentWidget, 1);
+    }
+
+    void applyThemeStyleSheet()
+    {
+        if (m_applyingThemeStyleSheet) {
+            return;
+        }
+        m_applyingThemeStyleSheet = true;
+
+        const QPalette palette = QApplication::palette();
+        const bool dark = palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+        if (dark) {
+            setStyleSheet(QStringLiteral(
+                "#thuCompilerView { background: #1e1e1e; color: #d4d4d4; }"
+                "#thuCompilerView QLabel { color: #d4d4d4; }"
+                "#modeCard { border: 1px solid #3c3c3c; border-radius: 8px; background: #252526; color: #d4d4d4; }"
+                "#modeCard:hover { border-color: #007acc; background: #2a2d2e; }"
+                "#modeTitle { font-weight: 600; }"
+                "#modeGlyph { color: #4fc1ff; font-size: 42px; font-weight: 600; }"
+                "#sidePanel { border-left: 1px solid #3c3c3c; background: #252526; color: #cccccc; }"
+                "#outputTitle { font-weight: 600; }"
+                "#successBanner { background: #143d25; border: 1px solid #287a3e; color: #89d185; border-radius: 6px; padding: 8px; }"
+                "QGroupBox { border: 1px solid #3c3c3c; border-radius: 6px; margin-top: 10px; color: #d4d4d4; }"
+                "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #d4d4d4; }"
+                "QCheckBox, QRadioButton { color: #d4d4d4; }"
+                "QPushButton { min-height: 26px; background: #3c3c3c; color: #cccccc; border: 1px solid #555555; border-radius: 4px; padding: 4px 10px; }"
+                "QPushButton:hover { background: #4b4b4b; border-color: #6b6b6b; }"
+                "QPushButton:disabled { background: #2d2d30; color: #6a6a6a; border-color: #3c3c3c; }"
+                "QPushButton#primaryButton { background: #0e639c; color: #ffffff; border: 0; border-radius: 4px; padding: 8px 16px; }"
+                "QPushButton#primaryButton:hover { background: #1177bb; }"
+                "QPushButton#primaryButton:disabled { background: #264f78; color: #9fbdd2; }"
+                "QListWidget { background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; border-radius: 6px; }"
+                "QListWidget::item { padding: 3px 4px; }"
+                "QListWidget::item:selected { background: #264f78; color: #ffffff; }"
+                "QListWidget::item:hover { background: #2a2d2e; }"
+                "QPlainTextEdit { background: #1e1e1e; color: #d4d4d4; selection-background-color: #264f78; selection-color: #ffffff; border: 1px solid #3c3c3c; border-radius: 6px; }"
+                "QComboBox { background: #3c3c3c; color: #cccccc; border: 1px solid #555555; border-radius: 4px; padding: 4px 8px; }"
+                "QComboBox:hover { border-color: #6b6b6b; }"
+                "QComboBox QAbstractItemView { background: #252526; color: #d4d4d4; selection-background-color: #264f78; selection-color: #ffffff; border: 1px solid #3c3c3c; }"));
+            m_applyingThemeStyleSheet = false;
+            return;
+        }
+
+        setStyleSheet(QStringLiteral(
+            "#thuCompilerView { background: #ffffff; }"
+            "#modeCard { border: 1px solid #d9dde7; border-radius: 8px; background: #ffffff; }"
+            "#modeCard:hover { border-color: #6d3cc8; background: #fbf8ff; }"
+            "#modeTitle { font-weight: 600; }"
+            "#modeGlyph { color: #6d3cc8; font-size: 42px; font-weight: 600; }"
+            "#sidePanel { border-left: 1px solid #d9dde7; background: #fbfbfd; }"
+            "#outputTitle { font-weight: 600; }"
+            "#successBanner { background: #eef8ee; border: 1px solid #cae8ca; color: #2b8a3e; border-radius: 6px; padding: 8px; }"
+            "QPushButton { min-height: 26px; }"
+            "QPushButton#primaryButton { background: #673ab7; color: white; border: 0; border-radius: 4px; padding: 8px 16px; }"
+            "QPushButton#primaryButton:disabled { background: #b8acd2; }"
+            "QListWidget { border: 1px solid #d9dde7; border-radius: 6px; }"
+            "QListWidget::item:selected { background: #f6edbd; color: #222; }"
+            "QPlainTextEdit { border: 1px solid #d9dde7; border-radius: 6px; }"));
+        m_applyingThemeStyleSheet = false;
+    }
+
+    void scheduleThemeStyleSheetUpdate()
+    {
+        if (m_themeStyleSheetUpdatePending) {
+            return;
+        }
+
+        m_themeStyleSheetUpdatePending = true;
+        QTimer::singleShot(0, this, [this] {
+            m_themeStyleSheetUpdatePending = false;
+            applyThemeStyleSheet();
+        });
     }
 
     void setupOptionPages()
@@ -802,6 +870,8 @@ private:
     QWidget* m_contentWidget = nullptr;
     QHBoxLayout* m_rootLayout = nullptr;
     QDialog* m_fullscreenDialog = nullptr;
+    bool m_applyingThemeStyleSheet = false;
+    bool m_themeStyleSheetUpdatePending = false;
     QString m_compilerRoot;
     QString m_outputDirectory;
     QString m_compileScriptPath;

@@ -7,6 +7,7 @@
 #include "documentswitchertreeview.h"
 
 #include <QKeyEvent>
+#include <QPalette>
 
 #include <widgetcolorizer.h>
 #include <path.h>
@@ -50,7 +51,8 @@ void DocumentSwitcherTreeView::drawBranches(QPainter* painter, const QRect& rect
     if (WidgetColorizer::colorizeByProject()) {
         if (const auto project = index.data(ProjectRole).value<IProject *>()) {
             const auto projectPath = project->path();
-            const QColor color = WidgetColorizer::colorForId(qHash(projectPath), palette(), true);
+            const bool dark = palette().color(QPalette::Window).lightness() < palette().color(QPalette::WindowText).lightness();
+            const QColor color = dark ? QColor(QStringLiteral("#252526")) : WidgetColorizer::colorForId(qHash(projectPath), palette(), true);
             WidgetColorizer::drawBranches(this, painter, rect, index, color);
         }
     }

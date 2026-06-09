@@ -9,6 +9,7 @@
 
 #include "idealtoolbutton.h"
 #include <KAcceleratorManager>
+#include <QPalette>
 #include <QStyleOption>
 #include <QStylePainter>
 #include <QApplication>
@@ -129,6 +130,19 @@ void IdealToolButton::paintEvent(QPaintEvent *event)
     QStylePainter painter(this);
     QStyleOptionToolButton option;
     initStyleOption(&option);
+    if (option.palette.color(QPalette::Window).lightness() < 128) {
+        const QColor textColor(QStringLiteral("#d4d4d4"));
+        const QColor disabledTextColor(QStringLiteral("#858585"));
+        option.palette.setColor(QPalette::Active, QPalette::WindowText, textColor);
+        option.palette.setColor(QPalette::Inactive, QPalette::WindowText, textColor);
+        option.palette.setColor(QPalette::Disabled, QPalette::WindowText, disabledTextColor);
+        option.palette.setColor(QPalette::Active, QPalette::ButtonText, textColor);
+        option.palette.setColor(QPalette::Inactive, QPalette::ButtonText, textColor);
+        option.palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabledTextColor);
+        option.palette.setColor(QPalette::Active, QPalette::Text, textColor);
+        option.palette.setColor(QPalette::Inactive, QPalette::Text, textColor);
+        option.palette.setColor(QPalette::Disabled, QPalette::Text, disabledTextColor);
+    }
 
     if (_area == Qt::TopDockWidgetArea || _area == Qt::BottomDockWidgetArea) {
         // elide text
