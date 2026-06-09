@@ -218,13 +218,55 @@ function Test-ThuCompilerMingwRuntimeDir([string]$RuntimeDir) {
     return $true
 }
 
+function Test-ThuCompilerTexConvertorRuntimeDir([string]$ThuCompilerRoot, [string]$RuntimeDir) {
+    if (-not (Test-ThuCompilerMingwRuntimeDir $RuntimeDir)) {
+        return $false
+    }
+
+    $texConvertorExe = Join-Path $ThuCompilerRoot "tex-convertor\GReP-Simulator.exe"
+    if (-not (Test-Path -LiteralPath $texConvertorExe)) {
+        Write-Warning "THU compiler runtime probe cannot find GReP-Simulator.exe: $texConvertorExe"
+        return $false
+    }
+
+    $probeDir = Join-Path $env:TEMP ("rrise-thu-tex-runtime-probe-{0}-{1}" -f $PID, ([Guid]::NewGuid().ToString("N")))
+    New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
+    try {
+        Copy-Item -LiteralPath $texConvertorExe -Destination (Join-Path $probeDir "GReP-Simulator.exe") -Force
+        foreach ($dll in @("libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll")) {
+            Copy-Item -LiteralPath (Join-Path $RuntimeDir $dll) -Destination (Join-Path $probeDir $dll) -Force
+        }
+
+        Push-Location $probeDir
+        try {
+            $probeLog = Join-Path $probeDir "probe.log"
+            & cmd.exe /d /s /c '"GReP-Simulator.exe" -no_run -hw "__rrise_missing_probe__.tex" > "probe.log" 2>&1'
+            $exitCode = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+
+        if ($exitCode -eq -1073741511 -or $exitCode -eq -1073741515) {
+            Write-Warning "THU compiler runtime probe failed for $RuntimeDir with Windows loader exit code $exitCode."
+            return $false
+        }
+
+        return $true
+    } catch {
+        Write-Warning "THU compiler runtime probe failed for $RuntimeDir`: $($_.Exception.Message)"
+        return $false
+    } finally {
+        Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Resolve-ThuCompilerMingwRuntimeDir([string]$ThuCompilerRoot, [string]$ExplicitRuntimeDir) {
     if (-not [string]::IsNullOrWhiteSpace($ExplicitRuntimeDir)) {
         $full = [IO.Path]::GetFullPath($ExplicitRuntimeDir)
-        if (Test-ThuCompilerMingwRuntimeDir $full) {
+        if (Test-ThuCompilerTexConvertorRuntimeDir $ThuCompilerRoot $full) {
             return $full
         }
-        throw "THU compiler MinGW runtime directory is missing required DLLs: $full"
+        throw "THU compiler MinGW runtime directory is missing required DLLs or is incompatible with GReP-Simulator.exe: $full"
     }
 
     $thuParent = [IO.Path]::GetFullPath((Join-Path $ThuCompilerRoot ".."))
@@ -234,26 +276,32 @@ function Resolve-ThuCompilerMingwRuntimeDir([string]$ThuCompilerRoot, [string]$E
         (Join-Path $ThuCompilerRoot "tex-convertor"),
         (Join-Path $ThuCompilerRoot "mingw64\bin"),
         (Join-Path $ThuCompilerRoot "runtime\mingw64\bin"),
+        (Join-Path "C:\code\compiler" $knownReleaseRuntime),
+        (Join-Path "C:\code" $knownReleaseRuntime),
         (Join-Path $thuParent $knownReleaseRuntime),
         (Join-Path $thuGrandParent $knownReleaseRuntime)
     )
 
     foreach ($candidate in $candidates) {
         $full = [IO.Path]::GetFullPath($candidate)
-        if (Test-ThuCompilerMingwRuntimeDir $full) {
+        if (Test-ThuCompilerTexConvertorRuntimeDir $ThuCompilerRoot $full) {
             return $full
+        } elseif (Test-ThuCompilerMingwRuntimeDir $full) {
+            Write-Warning "Skipping incompatible THU compiler MinGW runtime: $full"
         }
     }
 
     $whereOutput = & where.exe libstdc++-6.dll 2>$null
     foreach ($libstdcpp in $whereOutput) {
         $candidate = Split-Path -Parent $libstdcpp
-        if (Test-ThuCompilerMingwRuntimeDir $candidate) {
+        if (Test-ThuCompilerTexConvertorRuntimeDir $ThuCompilerRoot $candidate) {
             return [IO.Path]::GetFullPath($candidate)
+        } elseif (Test-ThuCompilerMingwRuntimeDir $candidate) {
+            Write-Warning "Skipping incompatible THU compiler MinGW runtime: $candidate"
         }
     }
 
-    throw "Unable to find THU compiler MinGW runtime DLLs. Pass -ThuCompilerMingwRuntimeDir with a directory containing libstdc++-6.dll, libgcc_s_seh-1.dll and libwinpthread-1.dll."
+    throw "Unable to find THU compiler MinGW runtime DLLs compatible with GReP-Simulator.exe. Pass -ThuCompilerMingwRuntimeDir with a directory containing compatible libstdc++-6.dll, libgcc_s_seh-1.dll and libwinpthread-1.dll."
 }
 
 function Copy-ThuCompilerMingwRuntimeDlls([string]$ThuCompilerRoot, [string]$RuntimeDir) {
