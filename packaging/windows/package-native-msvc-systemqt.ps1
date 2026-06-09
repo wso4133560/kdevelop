@@ -5,6 +5,7 @@ param(
     [string]$CraftRoot = "C:\CraftRoot",
     [string]$RiscvToolkitDir = "",
     [string]$ThuCompilerDir = "",
+    [string]$ThuCompilerMingwRuntimeDir = "",
     [string]$OutputRoot = "D:\tmp\kdevelop-native-installer",
     [string]$InstallerName = "RRISE-Setup.exe",
     [switch]$SkipWindeployQt,
@@ -150,7 +151,118 @@ set "compiler_path=%~dp0"
 for %%I in ("%compiler_path%.") do set "compiler_path=%%~fI"
 '@
     $content = [regex]::Replace($content, 'set "compiler_path=[^"]*"', $replacement, 1)
+    $localSourceReplacement = @'
+            set "local_source=__rrise_thu_%%~na%%~xa"
+            copy /y "%%a" "!local_source!" > nul
+            if errorlevel 1 (
+                echo ERROR: failed to copy "%%a" to working directory!
+                exit /b 1
+            )
+            call "%MIDDLE%" "!local_source!" "!bitcode_file!"
+            set "middle_exit=!errorlevel!"
+            if exist "!local_source!" del /f /q "!local_source!"
+            if !middle_exit! neq 0 exit /b !middle_exit!
+'@
+    $content = [regex]::Replace(
+        $content,
+        'call "%MIDDLE%" "%%a" "!bitcode_file!"',
+        $localSourceReplacement,
+        1
+    )
+    $texConvertorReplacement = @'
+            if exist "ConfigPack.h" del /f /q "ConfigPack.h"
+            if exist "ConfigPack_sw.txt" del /f /q "ConfigPack_sw.txt"
+            set "tex_convertor_log=!file_name_without_ext!_tex_convertor.log"
+            "%TEX_CONVERTOR%" -no_run -hw  Schedule.tex > "!tex_convertor_log!" 2>&1
+            if errorlevel 1 exit /b !errorlevel!
+            if not exist "ConfigPack.h" ping -n 2 127.0.0.1 > nul
+            if not exist "ConfigPack.h" (
+                echo WARN: "ConfigPack.h" is not generated, retrying tex convertor...
+                "%TEX_CONVERTOR%" -no_run -hw  Schedule.tex >> "!tex_convertor_log!" 2>&1
+                if errorlevel 1 exit /b !errorlevel!
+                if not exist "ConfigPack.h" ping -n 2 127.0.0.1 > nul
+            )
+'@
+    $content = [regex]::Replace(
+        $content,
+        '"%TEX_CONVERTOR%" -no_run -hw\s+Schedule\.tex',
+        $texConvertorReplacement
+    )
+    $configPackReplacement = @'
+if exist "ConfigPack.h" (
+                ren ConfigPack.h  "!result_config!"
+            ) else (
+                echo ERROR: "ConfigPack.h" is not generated!
+                exit /b 1
+            )
+'@
+    $content = [regex]::Replace(
+        $content,
+        'if exist "ConfigPack\.h" \(\s*ren ConfigPack\.h\s+"!result_config!"\s*\)',
+        $configPackReplacement
+    )
     Set-Content -LiteralPath $compileBat -Value $content -NoNewline -Encoding ASCII
+}
+
+function Test-ThuCompilerMingwRuntimeDir([string]$RuntimeDir) {
+    if ([string]::IsNullOrWhiteSpace($RuntimeDir) -or -not (Test-Path -LiteralPath $RuntimeDir)) {
+        return $false
+    }
+
+    $required = @("libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll")
+    foreach ($dll in $required) {
+        if (-not (Test-Path -LiteralPath (Join-Path $RuntimeDir $dll))) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Resolve-ThuCompilerMingwRuntimeDir([string]$ThuCompilerRoot, [string]$ExplicitRuntimeDir) {
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitRuntimeDir)) {
+        $full = [IO.Path]::GetFullPath($ExplicitRuntimeDir)
+        if (Test-ThuCompilerMingwRuntimeDir $full) {
+            return $full
+        }
+        throw "THU compiler MinGW runtime directory is missing required DLLs: $full"
+    }
+
+    $thuParent = [IO.Path]::GetFullPath((Join-Path $ThuCompilerRoot ".."))
+    $thuGrandParent = [IO.Path]::GetFullPath((Join-Path $ThuCompilerRoot "..\.."))
+    $knownReleaseRuntime = "docs-for-thu-compiler-ReleaseV0.1\docs-for-thu-compiler-ReleaseV0.1\x86_64-8.1.0-release-posix-seh-rt_v6-rev0\mingw64\bin"
+    $candidates = @(
+        (Join-Path $ThuCompilerRoot "tex-convertor"),
+        (Join-Path $ThuCompilerRoot "mingw64\bin"),
+        (Join-Path $ThuCompilerRoot "runtime\mingw64\bin"),
+        (Join-Path $thuParent $knownReleaseRuntime),
+        (Join-Path $thuGrandParent $knownReleaseRuntime)
+    )
+
+    foreach ($candidate in $candidates) {
+        $full = [IO.Path]::GetFullPath($candidate)
+        if (Test-ThuCompilerMingwRuntimeDir $full) {
+            return $full
+        }
+    }
+
+    $whereOutput = & where.exe libstdc++-6.dll 2>$null
+    foreach ($libstdcpp in $whereOutput) {
+        $candidate = Split-Path -Parent $libstdcpp
+        if (Test-ThuCompilerMingwRuntimeDir $candidate) {
+            return [IO.Path]::GetFullPath($candidate)
+        }
+    }
+
+    throw "Unable to find THU compiler MinGW runtime DLLs. Pass -ThuCompilerMingwRuntimeDir with a directory containing libstdc++-6.dll, libgcc_s_seh-1.dll and libwinpthread-1.dll."
+}
+
+function Copy-ThuCompilerMingwRuntimeDlls([string]$ThuCompilerRoot, [string]$RuntimeDir) {
+    $texConvertorDir = Join-Path $ThuCompilerRoot "tex-convertor"
+    Require-Path $texConvertorDir "THU compiler tex-convertor directory"
+
+    foreach ($dll in @("libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll")) {
+        Copy-Item -LiteralPath (Join-Path $RuntimeDir $dll) -Destination (Join-Path $texConvertorDir $dll) -Force
+    }
 }
 
 function Copy-HicolorIconThemeIndex([string]$SourceBin, [string]$PayloadRoot) {
@@ -541,6 +653,9 @@ Get-ChildItem -LiteralPath $thuCompilerPayload -Recurse -File | ForEach-Object {
         $_.IsReadOnly = $false
     }
 }
+$thuCompilerRuntimeDir = Resolve-ThuCompilerMingwRuntimeDir $ThuCompilerDir $ThuCompilerMingwRuntimeDir
+Write-Host "Copying THU compiler MinGW runtime from $thuCompilerRuntimeDir..."
+Copy-ThuCompilerMingwRuntimeDlls $thuCompilerPayload $thuCompilerRuntimeDir
 Update-ThuCompilerScripts $thuCompilerPayload
 
 Write-Host "Copying RRISE logo..."

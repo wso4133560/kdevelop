@@ -539,6 +539,7 @@ private Q_SLOTS:
             return;
         }
 
+        m_expectedHeaderPaths.clear();
         QStringList args;
         if (m_mode == CompileMode::Fft) {
             args = {QStringLiteral("/c"), QStringLiteral("call"), compileBatPath(), QStringLiteral("-FFT"), m_fftPotCombo->currentData().toString()};
@@ -565,8 +566,14 @@ private Q_SLOTS:
             scriptLines << QStringLiteral("@echo off");
             scriptLines << QStringLiteral("setlocal");
             for (const QString& file : std::as_const(files)) {
+                const QString headerPath = QDir(outputDir).filePath(QFileInfo(file).completeBaseName() + QStringLiteral(".h"));
+                m_expectedHeaderPaths << headerPath;
                 scriptLines << QStringLiteral("call %1 -THC %2 %3").arg(quoteCmdArg(compileBatPath()), opt, quoteCmdArg(file));
                 scriptLines << QStringLiteral("if errorlevel 1 exit /b %errorlevel%");
+                scriptLines << QStringLiteral("if not exist %1 (").arg(quoteCmdArg(headerPath));
+                scriptLines << QStringLiteral("  echo ERROR: expected header not generated: %1").arg(QDir::toNativeSeparators(headerPath));
+                scriptLines << QStringLiteral("  exit /b 1");
+                scriptLines << QStringLiteral(")");
             }
             scriptLines << QStringLiteral("exit /b 0");
 
@@ -587,11 +594,19 @@ private Q_SLOTS:
         appendOutput(QStringLiteral("[INFO] 命令：cmd.exe %1\n").arg(args.join(QLatin1Char(' '))));
 
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        QStringList pathPrefixes;
+        const QString texConvertorDir = QDir(m_compilerRoot).filePath(QStringLiteral("tex-convertor"));
+        if (QFileInfo(texConvertorDir).isDir()) {
+            pathPrefixes << QDir::toNativeSeparators(texConvertorDir);
+        }
         const QString llvmBin = QDir(m_compilerRoot).filePath(QStringLiteral("llvm/bin"));
         if (QFileInfo(llvmBin).isDir()) {
-            const QString path = environment.value(QStringLiteral("PATH"));
-            environment.insert(QStringLiteral("PATH"), QDir::toNativeSeparators(llvmBin) + QLatin1Char(';') + path);
+            pathPrefixes << QDir::toNativeSeparators(llvmBin);
             appendOutput(QStringLiteral("[INFO] LLVM tools: %1\n").arg(QDir::toNativeSeparators(llvmBin)));
+        }
+        if (!pathPrefixes.isEmpty()) {
+            const QString path = environment.value(QStringLiteral("PATH"));
+            environment.insert(QStringLiteral("PATH"), pathPrefixes.join(QLatin1Char(';')) + QLatin1Char(';') + path);
         }
 
         m_process->setProgram(QStringLiteral("cmd.exe"));
@@ -611,7 +626,22 @@ private Q_SLOTS:
 
     void processFinished(int exitCode, QProcess::ExitStatus exitStatus)
     {
-        const bool ok = exitStatus == QProcess::NormalExit && exitCode == 0;
+        bool ok = exitStatus == QProcess::NormalExit && exitCode == 0;
+        QStringList missingHeaders;
+        if (ok) {
+            for (const QString& headerPath : std::as_const(m_expectedHeaderPaths)) {
+                if (!QFileInfo::exists(headerPath)) {
+                    missingHeaders << headerPath;
+                }
+            }
+        }
+        if (!missingHeaders.isEmpty()) {
+            ok = false;
+            appendOutput(QStringLiteral("[ERROR] THC header files were not generated:\n"));
+            for (const QString& headerPath : std::as_const(missingHeaders)) {
+                appendOutput(QStringLiteral("  %1\n").arg(QDir::toNativeSeparators(headerPath)));
+            }
+        }
         appendOutput(ok ? QStringLiteral("[INFO] 编译成功。\n") : QStringLiteral("[ERROR] 编译失败，退出码：%1\n").arg(exitCode));
         removeCompileScript();
         setStatus(ok);
@@ -775,6 +805,7 @@ private:
     QString m_compilerRoot;
     QString m_outputDirectory;
     QString m_compileScriptPath;
+    QStringList m_expectedHeaderPaths;
 };
 
 class ThuCompilerPlugin : public KDevelop::IPlugin
