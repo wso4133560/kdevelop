@@ -15,12 +15,12 @@ endif
 SUPPORT_ROOT := $(RRISE_TOOLKIT_ROOT)/verify/ck803_sample
 IFFT_SUPPORT_ROOT := $(RRISE_TOOLKIT_ROOT)/verify/ifft_project
 
-CC := csky-elfabiv2-gcc
-AS := csky-elfabiv2-gcc
-AR := csky-elfabiv2-ar
-OBJDUMP := csky-elfabiv2-objdump
-OBJCOPY := csky-elfabiv2-objcopy
-SIZE := csky-elfabiv2-size
+CC := riscv-elfabiv2-gcc
+AS := riscv-elfabiv2-gcc
+AR := riscv-elfabiv2-ar
+OBJDUMP := riscv-elfabiv2-objdump
+OBJCOPY := riscv-elfabiv2-objcopy
+SIZE := riscv-elfabiv2-size
 CHECKSUM := crc32
 
 CFLAGS := -mcpu=e803 -O0 -g -ffunction-sections -fdata-sections

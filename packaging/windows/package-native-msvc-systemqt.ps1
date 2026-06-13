@@ -313,6 +313,49 @@ function Copy-ThuCompilerMingwRuntimeDlls([string]$ThuCompilerRoot, [string]$Run
     }
 }
 
+function Install-RiscvToolchainAliases([string]$ToolkitRoot) {
+    $toolchainBin = Join-Path $ToolkitRoot "compiler\CKV2ElfMinilib_V3.10.29\bin"
+    Require-Path $toolchainBin "RISC-V toolkit compiler bin directory"
+
+    $tools = @(
+        "addr2line",
+        "ar",
+        "as",
+        "c++",
+        "c++filt",
+        "cpp",
+        "elfedit",
+        "g++",
+        "gcc",
+        "gcc-6.3.0",
+        "gcc-ar",
+        "gcc-nm",
+        "gcc-ranlib",
+        "gcov",
+        "gcov-tool",
+        "gdb",
+        "gprof",
+        "ld",
+        "ld.bfd",
+        "nm",
+        "objcopy",
+        "objdump",
+        "ranlib",
+        "readelf",
+        "size",
+        "strings",
+        "strip"
+    )
+
+    foreach ($tool in $tools) {
+        $source = Join-Path $toolchainBin ("csky-elfabiv2-{0}.exe" -f $tool)
+        $dest = Join-Path $toolchainBin ("riscv-elfabiv2-{0}.exe" -f $tool)
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination $dest -Force
+        }
+    }
+}
+
 function Copy-HicolorIconThemeIndex([string]$SourceBin, [string]$PayloadRoot) {
     $source = Join-Path $SourceBin "data\icons\hicolor\index.theme"
     Require-Path $source "hicolor icon theme index"
@@ -691,6 +734,7 @@ Get-ChildItem -LiteralPath $toolkitPayload -Recurse -File | ForEach-Object {
         $_.IsReadOnly = $false
     }
 }
+Install-RiscvToolchainAliases $toolkitPayload
 
 Write-Host "Copying THU compiler..."
 $thuCompilerPayload = Join-Path $appPayload "thu-compiler"

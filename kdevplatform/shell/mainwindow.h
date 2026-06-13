@@ -72,6 +72,7 @@ protected:
     virtual void cleanup();
     void initializeStatusBar() override;
     bool event( QEvent* ) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void dragEnterEvent( QDragEnterEvent* ) override;
     void dropEvent( QDropEvent* ) override;
     void createGUI(KParts::Part* part);

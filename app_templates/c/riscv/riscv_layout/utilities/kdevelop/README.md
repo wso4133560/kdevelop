@@ -7,3 +7,4 @@ These scripts build and debug the generated project against the toolkit installe
 - `clean_csky_target.cmd` removes generated `Obj` and `Lst` outputs.
 - `start_ck803_debugserver_39000.cmd` starts the T-Head debug server on port `39000`.
 - `start_ck803_gdb.cmd` starts `csky-elfabiv2-gdb` and executes the local startup scripts.
+- The installed toolkit provides `riscv-elfabiv2-*` tool aliases for build logs while delegating to the bundled toolchain.

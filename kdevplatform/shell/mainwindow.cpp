@@ -98,7 +98,14 @@ QString rriseDarkMenuStyleSheet()
         "color: #d4d4d4;"
         "border: 1px solid #3c3c3c;"
         "}"
+        "QMenu::section {"
+        "background: #252526;"
+        "color: #ffffff;"
+        "font-weight: 600;"
+        "padding: 5px 26px 5px 24px;"
+        "}"
         "QMenu::item {"
+        "background: transparent;"
         "color: #d4d4d4;"
         "padding: 5px 26px 5px 24px;"
         "}"
@@ -109,10 +116,23 @@ QString rriseDarkMenuStyleSheet()
         "QMenu::item:disabled {"
         "color: #858585;"
         "}"
+        "QMenu::item:checked {"
+        "background: #2a2d2e;"
+        "color: #ffffff;"
+        "}"
+        "QMenu::item:checked:selected {"
+        "background: #264f78;"
+        "color: #ffffff;"
+        "}"
         "QMenu::separator {"
         "height: 1px;"
         "background: #3c3c3c;"
         "margin: 4px 8px;"
+        "}"
+        "QMenu::right-arrow {"
+        "image: none;"
+        "width: 6px;"
+        "height: 6px;"
         "}");
 }
 
@@ -730,6 +750,7 @@ MainWindow::MainWindow( Sublime::Controller *parent, Qt::WindowFlags flags )
     }
 
     menuBar()->setCornerWidget(new AreaDisplay(this), Qt::TopRightCorner);
+    qApp->installEventFilter(this);
     scheduleRriseWindowThemeStyleSheetUpdate();
 }
 
@@ -817,6 +838,21 @@ bool KDevelop::MainWindow::event( QEvent* ev )
         scheduleRriseWindowThemeStyleSheetUpdate();
     }
     return Sublime::MainWindow::event(ev);
+}
+
+bool KDevelop::MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::Show
+        || event->type() == QEvent::Polish
+        || event->type() == QEvent::PolishRequest
+        || event->type() == QEvent::PaletteChange
+        || event->type() == QEvent::ApplicationPaletteChange) {
+        if (auto* menu = qobject_cast<QMenu*>(watched)) {
+            rriseApplyReadableDarkMenu(menu);
+        }
+    }
+
+    return Sublime::MainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::dragEnterEvent( QDragEnterEvent* ev )

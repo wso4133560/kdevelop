@@ -6,14 +6,14 @@ BuildDir=
 Title=RRISE CK803 %{APPNAMELC}
 
 [CustomBuildSystem][BuildConfig0][ToolBuild]
-Arguments=/c "utilities/kdevelop/build_all.cmd" %{APPNAMELC}
+Arguments=/d /s /c call utilities\kdevelop\build_all.cmd %{APPNAMELC}
 Enabled=true
 Environment=
 Executable=%COMSPEC%
 Type=0
 
 [CustomBuildSystem][BuildConfig0][ToolClean]
-Arguments=/c "utilities/kdevelop/clean_csky_target.cmd" %{APPNAMELC}
+Arguments=/d /s /c call utilities\kdevelop\clean_csky_target.cmd %{APPNAMELC}
 Enabled=true
 Environment=
 Executable=%COMSPEC%
