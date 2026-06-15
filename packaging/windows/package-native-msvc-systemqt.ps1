@@ -141,6 +141,31 @@ function Copy-QtPluginType([string]$QtDir, [string]$DestBin, [string]$PluginType
     }
 }
 
+function Write-RrisePackageInfo([string]$AppRoot, [string]$RepoRoot) {
+    $infoDir = Join-Path $AppRoot "bin\data\rrise"
+    New-Item -ItemType Directory -Force -Path $infoDir | Out-Null
+
+    $gitCommit = ""
+    try {
+        $gitCommit = (& git -C $RepoRoot rev-parse --short=12 HEAD 2>$null).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            $gitCommit = ""
+        }
+    } catch {
+        $gitCommit = ""
+    }
+
+    $packageTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz"
+    $packageTimeUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $content = @(
+        "[Package]",
+        "Time=$packageTime",
+        "TimeUtc=$packageTimeUtc",
+        "GitCommit=$gitCommit"
+    )
+    Set-Content -LiteralPath (Join-Path $infoDir "package-info.ini") -Value $content -Encoding ASCII
+}
+
 function Update-ThuCompilerScripts([string]$ThuCompilerRoot) {
     $compileBat = Join-Path $ThuCompilerRoot "compile.bat"
     Require-Path $compileBat "THU compiler compile.bat"
@@ -724,6 +749,7 @@ Write-Host "Removing RRISE-disabled KDevelop plugins..."
 Remove-RriseDisabledPlugins $appPayload
 Remove-RriseStaleTemplateArchives $appPayload
 Install-RriseTemplateDescriptions $appPayload
+Write-RrisePackageInfo $appPayload $repoRoot
 
 Write-Host "Copying RISC-V toolkit..."
 $toolkitPayload = Join-Path $appPayload "riscv_toolkit"

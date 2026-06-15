@@ -38,6 +38,8 @@
 #include <QTextStream>
 #include <QDBusInterface>
 #include <QDBusReply>
+#include <QDir>
+#include <QSettings>
 
 #include <QQuickWindow>
 
@@ -81,6 +83,29 @@ QString serializeOpenFilesMessage(const QVector<UrlInfo> &infos)
     return QString::fromLatin1(message.toHex());
 }
 #endif
+
+QString readRrisePackageTime()
+{
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    const QStringList candidates{
+        appDir.filePath(QStringLiteral("data/rrise/package-info.ini")),
+        appDir.filePath(QStringLiteral("../bin/data/rrise/package-info.ini")),
+    };
+
+    for (const QString& path : candidates) {
+        if (!QFileInfo::exists(path)) {
+            continue;
+        }
+
+        QSettings packageInfo(path, QSettings::IniFormat);
+        const QString packageTime = packageInfo.value(QStringLiteral("Package/Time")).toString().trimmed();
+        if (!packageTime.isEmpty()) {
+            return packageTime;
+        }
+    }
+
+    return {};
+}
 
 void openFiles(const QVector<UrlInfo>& infos)
 {
@@ -383,6 +408,10 @@ int main( int argc, char *argv[] )
                          i18n("The KDevelop Integrated Development Environment"), KAboutLicense::GPL,
                          i18n("Copyright 1999-%1, The KDevelop developers", QStringLiteral("2025")), QString(),
                          QStringLiteral("https://www.kdevelop.org/"));
+    const QString rrisePackageTime = readRrisePackageTime();
+    if (!rrisePackageTime.isEmpty()) {
+        aboutData.setOtherText(i18n("打包时间：%1", rrisePackageTime));
+    }
     aboutData.setDesktopFileName(QStringLiteral("org.kde.kdevelop"));
     aboutData.addAuthor(i18n("Igor Kushnir"),
                         i18n("General maintenance, Bug fixing and prevention, Performance improvements"),
