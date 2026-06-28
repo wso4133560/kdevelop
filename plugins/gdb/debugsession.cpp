@@ -56,7 +56,9 @@ using namespace KDevelop;
 
 namespace {
 constexpr int debugServerPort = 39000;
-constexpr int debugServerStartupTimeoutMs = 30000;
+constexpr int debugServerStartupTimeoutMs = 2000;
+constexpr int debugServerPortCheckTimeoutMs = 200;
+constexpr int debugServerPollIntervalMs = 100;
 QProcess* preflightDebugServerProcess = nullptr;
 
 void appendRriseTrace(const QString& message)
@@ -161,10 +163,10 @@ bool isDebugServerListening()
 {
 #ifdef Q_OS_WIN
     QProcess netstat;
-    netstat.start(QStringLiteral("netstat"), {QStringLiteral("-ano")});
-    if (!netstat.waitForFinished(3000)) {
+    netstat.start(QStringLiteral("netstat"), {QStringLiteral("-ano"), QStringLiteral("-p"), QStringLiteral("TCP")});
+    if (!netstat.waitForFinished(debugServerPortCheckTimeoutMs)) {
         netstat.kill();
-        netstat.waitForFinished();
+        netstat.waitForFinished(100);
         return false;
     }
 
@@ -352,7 +354,7 @@ bool DebugSession::prepareRemoteDebugging(const InferiorStartupInfo& startupInfo
             qCDebug(DEBUGGERGDB) << "CK803 debug server is listening on port" << debugServerPort;
             return true;
         }
-        if (preflightDebugServerProcess->waitForFinished(250)) {
+        if (preflightDebugServerProcess->waitForFinished(debugServerPollIntervalMs)) {
             break;
         }
     }
