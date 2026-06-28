@@ -1,6 +1,6 @@
 {
     "KPlugin": {
-        "Description": "Provides the welcome page visible in an empty session",
+        "Description": "Provides the RRISE welcome page visible in an empty session",
         "Description[ar]": "وفّر صفحة الترحيب المرئيّة في جلسة فارغة",
         "Description[az]": "Bo sessiyada salamlama səhifəsinin görünə bilməsini təmin edir",
         "Description[ca@valencia]": "Proporciona la visibilitat de la pàgina de benvinguda en una sessió buida",
@@ -35,7 +35,7 @@
         "Description[zh_TW]": "提供空白工作階段所顯示的歡迎頁面",
         "Icon": "kdevelop",
         "License": "LGPL-2.0+",
-        "Name": "KDevelop Welcome Page",
+        "Name": "RRISE Welcome Page",
         "Name[ar]": "صفحة ترحيب مطوّرك",
         "Name[az]": "KDevelop salamlama səhifəsi",
         "Name[ca@valencia]": "Pàgina de benvinguda de KDevelop",
@@ -43,7 +43,7 @@
         "Name[cs]": "Uvítací stránka KDevelop",
         "Name[de]": "KDevelop-Startseite",
         "Name[el]": "Σελίδα υποδοχής του KDevelop",
-        "Name[en_GB]": "KDevelop Welcome Page",
+        "Name[en_GB]": "RRISE Welcome Page",
         "Name[eo]": "Bonvenpaĝo de KDevelop",
         "Name[es]": "Página de bienvenida de KDevelop",
         "Name[et]": "KDevelopi tervituslehekülg",

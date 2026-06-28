@@ -19,6 +19,7 @@ class WelcomePageView;
 }
 
 class QModelIndex;
+class QEvent;
 
 class WelcomePageWidget : public QWidget
 {
@@ -47,9 +48,11 @@ private Q_SLOTS:
     void onSessionListSizeChanged(int size);
 
 private:
+    void changeEvent(QEvent* event) override;
     QAction* mainWindowActionById(const QString& id) const;
     void triggerMainWindowActionById(const QString& id);
     void triggerMainWindowActionMenuById(const QString& id);
+    void updateApplicationLogo();
 
 private:
     std::unique_ptr<Ui::WelcomePageView> const m_ui;

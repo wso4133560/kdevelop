@@ -938,6 +938,9 @@ void ProjectController::projectImportingFinished( IProject* project )
     d->m_projectPlugins.insert( project, pluglist );
     d->m_projects.append( project );
 
+    Q_ASSERT(d->m_currentlyOpening.contains(project->projectFile().toUrl()));
+    d->m_currentlyOpening.removeAll(project->projectFile().toUrl());
+
     if ( d->m_currentlyOpening.isEmpty() ) {
         d->saveListOfOpenedProjects();
     }
@@ -948,8 +951,6 @@ void ProjectController::projectImportingFinished( IProject* project )
         saveRecentProjectsActionEntries();
     }
 
-    Q_ASSERT(d->m_currentlyOpening.contains(project->projectFile().toUrl()));
-    d->m_currentlyOpening.removeAll(project->projectFile().toUrl());
     emit projectOpened( project );
 
     reparseProject(project);

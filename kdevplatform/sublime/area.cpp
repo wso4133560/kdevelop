@@ -344,6 +344,13 @@ void Area::load(const KConfigGroup& group)
             d->desiredToolViews[id] = pos;
         }
     }
+
+    // RRISE: these two custom tool views are both optional utility panels.
+    // If an old session saved both as visible, restore only Serial Port by default.
+    if (d->desiredToolViews.contains(QStringLiteral("org.kdevelop.SerialMonitor"))
+        && d->desiredToolViews.contains(QStringLiteral("org.kdevelop.ThuCompiler"))) {
+        d->desiredToolViews.remove(QStringLiteral("org.kdevelop.ThuCompiler"));
+    }
 }
 
 bool Area::wantToolView(const QString& id)

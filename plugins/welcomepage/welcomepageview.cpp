@@ -23,8 +23,49 @@
 #include <KActionCollection>
 #include <KIconLoader>
 // Qt
-#include <QSortFilterProxyModel>
+#include <QApplication>
 #include <QDesktopServices>
+#include <QEvent>
+#include <QImage>
+#include <QPalette>
+#include <QSortFilterProxyModel>
+
+namespace {
+bool isDarkPalette(const QPalette& palette)
+{
+    return palette.color(QPalette::Base).lightness() < palette.color(QPalette::Text).lightness();
+}
+
+QPixmap readableLogoPixmap(const QIcon& icon, int size, bool dark)
+{
+    QPixmap pixmap = icon.pixmap(size);
+    if (pixmap.isNull() || !dark) {
+        return pixmap;
+    }
+
+    QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+    constexpr int lightLogoRed = 238;
+    constexpr int lightLogoGreen = 242;
+    constexpr int lightLogoBlue = 246;
+
+    for (int y = 0; y < image.height(); ++y) {
+        auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor color = QColor::fromRgba(line[x]);
+            if (color.alpha() == 0) {
+                continue;
+            }
+
+            const int luminance = qGray(color.rgb());
+            if (luminance < 180) {
+                line[x] = qRgba(lightLogoRed, lightLogoGreen, lightLogoBlue, color.alpha());
+            }
+        }
+    }
+
+    return QPixmap::fromImage(image);
+}
+}
 
 WelcomePageWidget::WelcomePageWidget(QWidget* parent)
     : QWidget(parent)
@@ -32,8 +73,7 @@ WelcomePageWidget::WelcomePageWidget(QWidget* parent)
     , m_sessionListModel(new SessionListModel(this))
 {
     m_ui->setupUi(this);
-    m_ui->appIconLabel->setPixmap(
-        QIcon::fromTheme(QStringLiteral("kdevelop")).pixmap(KIconLoader::global()->currentSize(KIconLoader::Desktop)));
+    updateApplicationLogo();
 
     m_ui->pageFrame->setBackgroundRole(QPalette::Base);
 
@@ -44,18 +84,6 @@ WelcomePageWidget::WelcomePageWidget(QWidget* parent)
 
     m_ui->sessionsListView->setModel(sessionsModelSortProxyModel);
 
-#ifdef Q_OS_WIN
-    m_ui->welcomeText->setText(
-        m_ui->welcomeText->text()
-        + i18n("<br/>\n"
-               "<h3>Note for Windows users</h3>\n"
-               "<p>Note that KDevelop does NOT ship a C/C++ compiler on Windows!</p>\n"
-               "<p>You need to install either GCC via MinGW or install a recent version of the Microsoft Visual Studio "
-               "IDE and make sure the environment is setup correctly <i>before</i> starting KDevelop.</p>\n"
-               "<p>If you need further assistance, please check out the <a "
-               "href=\"https://userbase.kde.org/KDevelop4/Manual/WindowsSetup\">KDevelop under Windows "
-               "instructions.</a></p>"));
-#endif
     connect(m_ui->welcomeText, &QLabel::linkActivated, this, &WelcomePageWidget::onWelcomeTextLinkClicked);
 
     onSessionListSizeChanged(m_sessionListModel->size());
@@ -77,6 +105,23 @@ WelcomePageWidget::WelcomePageWidget(QWidget* parent)
     connect(m_ui->openProjectButton, &QPushButton::clicked, this, &WelcomePageWidget::onOpenProjectClicked);
     connect(m_ui->fetchProjectButton, &QPushButton::clicked, this, &WelcomePageWidget::onFetchProjectClicked);
     connect(m_ui->recentProjectsButton, &QPushButton::clicked, this, &WelcomePageWidget::onRecentProjectsClicked);
+}
+
+void WelcomePageWidget::changeEvent(QEvent* event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::PaletteChange) {
+        updateApplicationLogo();
+    }
+}
+
+void WelcomePageWidget::updateApplicationLogo()
+{
+    const QIcon appIcon = QApplication::windowIcon().isNull()
+        ? QIcon::fromTheme(QStringLiteral("kdevelop"))
+        : QApplication::windowIcon();
+    const int size = KIconLoader::global()->currentSize(KIconLoader::Desktop);
+    m_ui->appIconLabel->setPixmap(readableLogoPixmap(appIcon, size, isDarkPalette(palette())));
 }
 
 QAction* WelcomePageWidget::mainWindowActionById(const QString& id) const

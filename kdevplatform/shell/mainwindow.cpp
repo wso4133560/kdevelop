@@ -56,6 +56,7 @@
 #include "ktexteditorpluginintegration.h"
 
 #include <interfaces/isession.h>
+#include <interfaces/iproject.h>
 #include <interfaces/iprojectcontroller.h>
 #include <sublime/view.h>
 #include <sublime/document.h>
@@ -81,6 +82,29 @@ bool rriseIsDarkWindowPalette(const QPalette& palette)
 bool rriseIsDarkPalette()
 {
     return rriseIsDarkWindowPalette(QApplication::palette());
+}
+
+QString rriseCurrentSessionTitle()
+{
+    const auto activeSession = Core::self()->sessionController()->activeSession();
+    const QString sessionName = activeSession ? activeSession->name() : QString();
+
+    QStringList projectNames;
+    const auto projects = Core::self()->projectController()->projects();
+    projectNames.reserve(projects.size());
+    for (const IProject* project : projects) {
+        if (project) {
+            projectNames << project->name();
+        }
+    }
+
+    const QString projectTitle = projectNames.isEmpty()
+        ? i18n("(no projects)")
+        : projectNames.join(QLatin1String(", "));
+
+    return sessionName.isEmpty()
+        ? projectTitle
+        : sessionName + QLatin1String(":  ") + projectTitle;
 }
 
 void rriseSetPaletteColor(QPalette& palette, QPalette::ColorRole role, const QColor& active, const QColor& disabled)
@@ -441,6 +465,64 @@ const QHash<QString, QString>& actionTextTranslations()
     return translations;
 }
 
+bool rriseShouldHideHelpAction(const QAction* action)
+{
+    if (!action) {
+        return false;
+    }
+
+    static const QStringList hiddenActionNames = {
+        QStringLiteral("help_about_kde"),
+        QStringLiteral("help_report_bug"),
+        QStringLiteral("help_donate"),
+        QStringLiteral("help_contents"),
+        QStringLiteral("switch_application_language"),
+    };
+    if (hiddenActionNames.contains(action->objectName())) {
+        return true;
+    }
+
+    static const QStringList hiddenActionTexts = {
+        QStringLiteral("About KDE"),
+        QStringLiteral("Report Bug..."),
+        QStringLiteral("Donate"),
+        QStringLiteral("Help Contents"),
+        QStringLiteral("RRISE Handbook"),
+        QStringLiteral("Handbook"),
+        QStringLiteral("Switch Application Language..."),
+    };
+    return hiddenActionTexts.contains(normalizedMenuTitle(action->text()));
+}
+
+void rrisePruneMenuSeparators(QMenu* menu)
+{
+    if (!menu) {
+        return;
+    }
+
+    bool previousVisibleWasSeparator = true;
+    QAction* lastVisibleSeparator = nullptr;
+    for (QAction* action : menu->actions()) {
+        if (!action || !action->isVisible()) {
+            continue;
+        }
+        if (action->isSeparator()) {
+            const bool hide = previousVisibleWasSeparator;
+            action->setVisible(!hide);
+            if (!hide) {
+                lastVisibleSeparator = action;
+            }
+            previousVisibleWasSeparator = true;
+        } else {
+            previousVisibleWasSeparator = false;
+            lastVisibleSeparator = nullptr;
+        }
+    }
+
+    if (lastVisibleSeparator && previousVisibleWasSeparator) {
+        lastVisibleSeparator->setVisible(false);
+    }
+}
 const QHash<QString, QString>& actionNameTranslations()
 {
     static const QHash<QString, QString> translations = {
@@ -596,7 +678,14 @@ void localizeMenu(QMenu* menu)
     }
 
     for (QAction* action : menu->actions()) {
-        if (!action || action->isSeparator()) {
+        if (!action) {
+            continue;
+        }
+        if (rriseShouldHideHelpAction(action)) {
+            action->setVisible(false);
+            continue;
+        }
+        if (action->isSeparator()) {
             continue;
         }
 
@@ -624,6 +713,7 @@ void localizeMenu(QMenu* menu)
         }
         localizeMenu(subMenu);
     }
+    rrisePruneMenuSeparators(menu);
 }
 
 }
@@ -1066,6 +1156,7 @@ void MainWindow::initialize()
     connect(Core::self()->sessionController()->activeSession(), &ISession::sessionUpdated, this, &MainWindow::updateCaption);
     // if currently viewed document is part of project, trigger update of full path to project prefixed one
     connect(Core::self()->projectController(), &ProjectController::projectOpened, this, &MainWindow::updateCaption, Qt::QueuedConnection);
+    connect(Core::self()->projectController(), &ProjectController::projectClosed, this, &MainWindow::updateCaption, Qt::QueuedConnection);
 
     connect(Core::self()->documentController(), &IDocumentController::documentOpened, this, &MainWindow::updateTabColor);
     connect(Core::self()->documentController(), &IDocumentController::documentUrlChanged, this, &MainWindow::updateTabColor);
@@ -1133,8 +1224,7 @@ void MainWindow::updateCaption()
         isDocumentModified = iDoc && (iDoc->state() != IDocument::Clean);
     }
 
-    const auto activeSession = Core::self()->sessionController()->activeSession();
-    const QString sessionTitle = activeSession ? activeSession->description() : QString();
+    const QString sessionTitle = rriseCurrentSessionTitle();
     if (!sessionTitle.isEmpty()) {
         if (title.isEmpty()) {
             title = sessionTitle;

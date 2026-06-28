@@ -31,6 +31,8 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTextCharFormat>
+#include <QTextCursor>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -440,10 +442,9 @@ private:
         }
 
         m_themeStyleSheetApplying = true;
-        const QPalette palette = QApplication::palette();
-        const bool dark = palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
-        if (!dark) {
+        if (!isDarkTheme()) {
             setStyleSheet(QString{});
+            applyOutputPalette();
             m_themeStyleSheetApplying = false;
             return;
         }
@@ -514,7 +515,56 @@ private:
             "border: 1px solid #3c3c3c;"
             "border-radius: 3px;"
             "}"));
+        applyOutputPalette();
         m_themeStyleSheetApplying = false;
+    }
+
+    bool isDarkTheme() const
+    {
+        const QPalette palette = QApplication::palette();
+        return palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+    }
+
+    QTextCharFormat outputTextFormat() const
+    {
+        QTextCharFormat format;
+        format.setForeground(isDarkTheme() ? QColor(QStringLiteral("#d4d4d4")) : QApplication::palette().color(QPalette::Text));
+        return format;
+    }
+
+    void applyOutputPalette()
+    {
+        QPalette palette = QApplication::palette();
+        if (isDarkTheme()) {
+            palette.setColor(QPalette::Base, QColor(QStringLiteral("#111315")));
+            palette.setColor(QPalette::Text, QColor(QStringLiteral("#d4d4d4")));
+            palette.setColor(QPalette::Highlight, QColor(QStringLiteral("#264f78")));
+            palette.setColor(QPalette::HighlightedText, Qt::white);
+        }
+        m_output->setPalette(palette);
+        refreshOutputTextColor();
+    }
+
+    void refreshOutputTextColor()
+    {
+        const QTextCharFormat format = outputTextFormat();
+        QTextCursor documentCursor(m_output->document());
+        documentCursor.select(QTextCursor::Document);
+        documentCursor.mergeCharFormat(format);
+
+        QTextCursor cursor = m_output->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        cursor.setCharFormat(format);
+        m_output->setTextCursor(cursor);
+    }
+
+    void appendOutputText(const QString& text)
+    {
+        QTextCursor cursor = m_output->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        cursor.setCharFormat(outputTextFormat());
+        cursor.insertText(text);
+        m_output->setTextCursor(cursor);
     }
 
     void scheduleThemeStyleSheetUpdate()
@@ -677,9 +727,7 @@ private:
         writeLogFile(text);
 
         for (SerialMonitorView* view : std::as_const(s_views)) {
-            view->m_output->moveCursor(QTextCursor::End);
-            view->m_output->insertPlainText(text);
-            view->m_output->moveCursor(QTextCursor::End);
+            view->appendOutputText(text);
         }
     }
 
@@ -756,7 +804,7 @@ private:
     void syncFromSharedState()
     {
         m_output->setPlainText(s_output);
-        m_output->moveCursor(QTextCursor::End);
+        refreshOutputTextColor();
         m_statusLabel->setText(s_status);
         updateUi(s_portOpen || s_opening);
         updateLogUi();
@@ -855,19 +903,14 @@ public:
         , m_factory(new SerialToolViewFactory)
     {
         const QString toolViewName = i18nc("@title:window", "Serial Port");
-        core()->uiController()->addToolView(toolViewName, m_factory, KDevelop::IUiController::CreateAndRaise);
-        auto raiseSerialView = [this, toolViewName]() {
-            core()->uiController()->findToolView(toolViewName, m_factory, KDevelop::IUiController::CreateAndRaise);
+        core()->uiController()->addToolView(toolViewName, m_factory, KDevelop::IUiController::Create);
+        auto createSerialView = [this, toolViewName]() {
+            core()->uiController()->findToolView(toolViewName, m_factory, KDevelop::IUiController::Create);
         };
-        QTimer::singleShot(0, this, raiseSerialView);
-        connect(core()->debugController(),
-                &KDevelop::IDebugController::currentSessionChanged,
-                this,
-                [this, raiseSerialView](KDevelop::IDebugSession* session, KDevelop::IDebugSession*) {
-            QTimer::singleShot(0, this, raiseSerialView);
-            QTimer::singleShot(500, this, raiseSerialView);
-            Q_UNUSED(session);
-        });
+        QTimer::singleShot(0, this, createSerialView);
+        QTimer::singleShot(500, this, createSerialView);
+        QTimer::singleShot(2000, this, createSerialView);
+        QTimer::singleShot(5000, this, createSerialView);
     }
 
     void unload() override

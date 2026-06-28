@@ -24,13 +24,62 @@
 
 #include <QBoxLayout>
 #include <QApplication>
+#include <QImage>
 #include <QList>
 #include <QPalette>
+#include <QPixmap>
 #include <QScopeGuard>
 
 #include <algorithm>
 
 namespace Sublime {
+
+namespace {
+bool rriseUseLightToolViewIcons()
+{
+    const QPalette palette = QApplication::palette();
+    return palette.color(QPalette::Window).lightness() < 128;
+}
+
+QPixmap rriseReadableDarkPixmap(const QIcon& icon, int size)
+{
+    QPixmap pixmap = icon.pixmap(size, size);
+    if (pixmap.isNull()) {
+        return pixmap;
+    }
+
+    QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+    for (int y = 0; y < image.height(); ++y) {
+        auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor color = QColor::fromRgba(line[x]);
+            if (color.alpha() == 0) {
+                continue;
+            }
+            if (qGray(color.rgb()) < 135) {
+                line[x] = qRgba(212, 212, 212, color.alpha());
+            }
+        }
+    }
+    return QPixmap::fromImage(image);
+}
+
+QIcon rriseReadableToolViewIcon(const QIcon& icon)
+{
+    if (icon.isNull() || !rriseUseLightToolViewIcons()) {
+        return icon;
+    }
+
+    QIcon readableIcon;
+    for (const int size : {16, 22, 32, 48}) {
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Normal, QIcon::Off);
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Normal, QIcon::On);
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Selected, QIcon::Off);
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Selected, QIcon::On);
+    }
+    return readableIcon;
+}
+}
 
 class ToolViewAction : public QAction
 {
@@ -44,7 +93,8 @@ public:
         setCheckable(true);
 
         const QString title = dock->view()->document()->title();
-        setIcon(dock->windowIcon());
+        m_originalIcon = dock->windowIcon();
+        updateIconForPalette();
         setToolTip(i18nc("@info:tooltip", "Toggle '%1' tool view", title));
         setText(title);
 
@@ -71,6 +121,7 @@ public:
     void setButton(IdealToolButton* button) {
         Q_ASSERT(button);
         m_button = button;
+        m_button->installEventFilter(this);
         updateButtonForWidget();
     }
 
@@ -104,6 +155,7 @@ private:
             }
             break;
         case QEvent::PaletteChange:
+        case QEvent::ApplicationPaletteChange:
             if (watched == m_button) {
                 updateButtonForWidget();
             }
@@ -118,6 +170,7 @@ private:
     void updateButtonForWidget()
     {
         Q_ASSERT(m_button);
+        updateIconForPalette();
 
         // Use the inactive color for the text of the tool button if its tool view widget is disabled
         // in order to indicate whether the tool view is enabled even while it is hidden.
@@ -132,9 +185,6 @@ private:
         if (!m_wasToolViewWidgetEverDisabled) {
             Q_ASSERT(!enabled); // otherwise should have returned earlier
             m_wasToolViewWidgetEverDisabled = true;
-            // Once the palette of the button is adjusted, we have to handle its palette-change events because the text
-            // color of the button is no longer updated automatically when the user switches between color schemes.
-            m_button->installEventFilter(this);
         }
 
         auto palette = m_button->palette();
@@ -147,7 +197,13 @@ private:
 
     IdealDockWidget* const m_dock;
     IdealToolButton* m_button = nullptr;
+    QIcon m_originalIcon;
     bool m_wasToolViewWidgetEverDisabled = false;
+
+    void updateIconForPalette()
+    {
+        setIcon(rriseReadableToolViewIcon(m_originalIcon));
+    }
 };
 
 static ToolViewAction* knownValidToolViewAction(QObject* object)

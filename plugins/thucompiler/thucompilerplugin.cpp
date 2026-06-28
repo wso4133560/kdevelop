@@ -888,11 +888,14 @@ public:
         , m_factory(new ThuCompilerToolViewFactory)
     {
         const QString toolViewName = QStringLiteral("THU Compiler");
-        core()->uiController()->addToolView(toolViewName, m_factory, KDevelop::IUiController::CreateAndRaise);
-        auto raiseThuCompilerView = [this, toolViewName]() {
-            core()->uiController()->findToolView(toolViewName, m_factory, KDevelop::IUiController::CreateAndRaise);
+        core()->uiController()->addToolView(toolViewName, m_factory, KDevelop::IUiController::Create);
+        auto createThuCompilerView = [this, toolViewName]() {
+            core()->uiController()->findToolView(toolViewName, m_factory, KDevelop::IUiController::Create);
         };
-        QTimer::singleShot(0, this, raiseThuCompilerView);
+        QTimer::singleShot(0, this, createThuCompilerView);
+        QTimer::singleShot(500, this, createThuCompilerView);
+        QTimer::singleShot(2000, this, createThuCompilerView);
+        QTimer::singleShot(5000, this, createThuCompilerView);
     }
 
     void unload() override

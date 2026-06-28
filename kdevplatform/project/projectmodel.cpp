@@ -8,11 +8,15 @@
 
 #include "projectmodel.h"
 
+#include <QApplication>
 #include <QIcon>
+#include <QImage>
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QPalette>
+#include <QPixmap>
 
 #include <KIO/StatJob>
 #include <KLocalizedString>
@@ -29,6 +33,51 @@
 
 namespace KDevelop
 {
+
+namespace {
+bool rriseUseLightTreeIcons()
+{
+    const QPalette palette = QApplication::palette();
+    return palette.color(QPalette::Base).lightness() < palette.color(QPalette::Text).lightness();
+}
+
+QPixmap rriseReadableDarkPixmap(const QIcon& icon, int size)
+{
+    QPixmap pixmap = icon.pixmap(size, size);
+    if (pixmap.isNull()) {
+        return pixmap;
+    }
+
+    QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+    for (int y = 0; y < image.height(); ++y) {
+        auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor color = QColor::fromRgba(line[x]);
+            if (color.alpha() == 0) {
+                continue;
+            }
+            if (qGray(color.rgb()) < 135) {
+                line[x] = qRgba(212, 212, 212, color.alpha());
+            }
+        }
+    }
+    return QPixmap::fromImage(image);
+}
+
+QIcon rriseReadableTreeIcon(const QIcon& icon)
+{
+    if (icon.isNull() || !rriseUseLightTreeIcons()) {
+        return icon;
+    }
+
+    QIcon readableIcon;
+    for (const int size : {16, 22, 32, 48}) {
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Normal, QIcon::Off);
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Normal, QIcon::On);
+    }
+    return readableIcon;
+}
+}
 
 QStringList removeProjectBasePath( const QStringList& fullpath, KDevelop::ProjectBaseItem* item )
 {
@@ -978,7 +1027,7 @@ QVariant ProjectModel::data( const QModelIndex& index, int role ) const
         if( item ) {
             switch(role) {
                 case Qt::DecorationRole:
-                    return QIcon::fromTheme(item->iconName());
+                    return rriseReadableTreeIcon(QIcon::fromTheme(item->iconName()));
                 case Qt::ToolTipRole:
                     return item->path().pathOrUrl();
                 case Qt::DisplayRole:

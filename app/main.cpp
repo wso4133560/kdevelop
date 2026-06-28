@@ -33,6 +33,7 @@
 #include <QCommandLineParser>
 #include <QCommandLineOption>
 #include <QFileInfo>
+#include <QIcon>
 #include <QProcessEnvironment>
 #include <QSessionManager>
 #include <QTextStream>
@@ -105,6 +106,30 @@ QString readRrisePackageTime()
     }
 
     return {};
+}
+
+QIcon loadRriseApplicationIcon()
+{
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    const QStringList candidates{
+        appDir.filePath(QStringLiteral("../pics/rrise-logo.ico")),
+        appDir.filePath(QStringLiteral("../pics/清科芯擎LOGO-中英文组合-黑.svg")),
+        appDir.filePath(QStringLiteral("pics/rrise-logo.ico")),
+        appDir.filePath(QStringLiteral("pics/清科芯擎LOGO-中英文组合-黑.svg")),
+    };
+
+    for (const QString& path : candidates) {
+        if (!QFileInfo::exists(path)) {
+            continue;
+        }
+
+        const QIcon icon(path);
+        if (!icon.isNull()) {
+            return icon;
+        }
+    }
+
+    return QIcon::fromTheme(QStringLiteral("kdevelop"), QApplication::windowIcon());
 }
 
 void openFiles(const QVector<UrlInfo>& infos)
@@ -402,12 +427,13 @@ int main( int argc, char *argv[] )
 #endif
 
     KLocalizedString::setApplicationDomain(QByteArrayLiteral("kdevelop"));
+    const QIcon rriseApplicationIcon = loadRriseApplicationIcon();
 
-    KAboutData aboutData(QStringLiteral("kdevelop"), i18n("KDevelop"),
+    KAboutData aboutData(QStringLiteral("kdevelop"), i18n("RRISE"),
                          QStringLiteral(KDEVELOP_VERSION_STRING " (" RELEASE_SERVICE_VERSION_STRING ")"),
-                         i18n("The KDevelop Integrated Development Environment"), KAboutLicense::GPL,
+                         i18n("The RRISE Integrated Development Environment"), KAboutLicense::GPL,
                          i18n("Copyright 1999-%1, The KDevelop developers", QStringLiteral("2025")), QString(),
-                         QStringLiteral("https://www.kdevelop.org/"));
+                         QStringLiteral("https://www.rrise.com/"));
     const QString rrisePackageTime = readRrisePackageTime();
     if (!rrisePackageTime.isEmpty()) {
         aboutData.setOtherText(i18n("打包时间：%1", rrisePackageTime));
@@ -480,7 +506,7 @@ int main( int argc, char *argv[] )
     KAboutData::setApplicationData(aboutData);
     // set icon for shells which do not use desktop file metadata
     // but without setting replacing an existing icon with an empty one!
-    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("kdevelop"), QApplication::windowIcon()));
+    QApplication::setWindowIcon(rriseApplicationIcon);
 
     KCrash::initialize();
 

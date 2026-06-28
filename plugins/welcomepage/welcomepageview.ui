@@ -52,7 +52,7 @@
           </font>
          </property>
          <property name="text">
-          <string>KDevelop</string>
+          <string>RRISE</string>
          </property>
         </widget>
        </item>
@@ -91,7 +91,7 @@
          <item>
           <widget class="KUrlLabel" name="homepageLinkLabel">
            <property name="text">
-            <string>KDevelop.org</string>
+            <string>RRISE</string>
            </property>
            <property name="glowEnabled">
             <bool>false</bool>
@@ -101,7 +101,7 @@
          <item>
           <widget class="KUrlLabel" name="learnAboutLinkLabel">
            <property name="text">
-            <string>Learn about KDevelop</string>
+            <string>Learn about RRISE</string>
            </property>
            <property name="glowEnabled">
             <bool>false</bool>
@@ -111,7 +111,7 @@
          <item>
           <widget class="KUrlLabel" name="joinTeamLinkLabel">
            <property name="text">
-            <string>Join KDevelop's team!</string>
+            <string>RRISE Support</string>
            </property>
            <property name="glowEnabled">
             <bool>false</bool>
@@ -285,9 +285,9 @@
           <item>
            <widget class="QLabel" name="welcomeText">
             <property name="text">
-             <string>&lt;h3&gt;Welcome to KDevelop!&lt;/h3&gt;
+             <string>&lt;h3&gt;Welcome to RRISE!&lt;/h3&gt;
 &lt;p&gt;You can start working on a project by opening an existing or creating a new one via the above buttons.&lt;/p&gt;
-&lt;p&gt;If you need help, please check out the &lt;a href=&quot;https://userbase.kde.org/KDevelop&quot;&gt;User Manual.&lt;/a&gt;&lt;/p&gt;</string>
+&lt;p&gt;If you need help, please check out the &lt;a href=&quot;https://www.rrise.com&quot;&gt;User Manual.&lt;/a&gt;&lt;/p&gt;</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>

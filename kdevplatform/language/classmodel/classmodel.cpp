@@ -16,8 +16,58 @@
 #include "../../interfaces/iproject.h"
 #include "../../interfaces/iprojectcontroller.h"
 
+#include <QApplication>
+#include <QImage>
+#include <QPalette>
+#include <QPixmap>
+
 using namespace KDevelop;
 using namespace ClassModelNodes;
+
+namespace {
+bool rriseUseLightClassIcons()
+{
+    const QPalette palette = QApplication::palette();
+    return palette.color(QPalette::Base).lightness() < palette.color(QPalette::Text).lightness();
+}
+
+QPixmap rriseReadableDarkPixmap(const QIcon& icon, int size)
+{
+    QPixmap pixmap = icon.pixmap(size, size);
+    if (pixmap.isNull()) {
+        return pixmap;
+    }
+
+    QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+    for (int y = 0; y < image.height(); ++y) {
+        auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor color = QColor::fromRgba(line[x]);
+            if (color.alpha() == 0) {
+                continue;
+            }
+            if (qGray(color.rgb()) < 135) {
+                line[x] = qRgba(212, 212, 212, color.alpha());
+            }
+        }
+    }
+    return QPixmap::fromImage(image);
+}
+
+QIcon rriseReadableClassIcon(const QIcon& icon)
+{
+    if (icon.isNull() || !rriseUseLightClassIcons()) {
+        return icon;
+    }
+
+    QIcon readableIcon;
+    for (const int size : {16, 22, 32, 48}) {
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Normal, QIcon::Off);
+        readableIcon.addPixmap(rriseReadableDarkPixmap(icon, size), QIcon::Normal, QIcon::On);
+    }
+    return readableIcon;
+}
+}
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -106,7 +156,7 @@ QVariant ClassModel::data(const QModelIndex& index, int role) const
 
     if (role == Qt::DecorationRole) {
         QIcon icon = node->cachedIcon();
-        return icon.isNull() ? QVariant() : icon;
+        return icon.isNull() ? QVariant() : rriseReadableClassIcon(icon);
     }
 
     return QVariant();
