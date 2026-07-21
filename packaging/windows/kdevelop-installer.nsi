@@ -46,6 +46,28 @@ Function un.KillDebugServerConsole
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DebugServerConsole.exe /T'
 FunctionEnd
 
+Function InstallCkLinkDrivers
+  ${IfNot} ${FileExists} "$INSTDIR\riscv_toolkit\debugger\T-HeadDebugServer_V5.16.6\drivers\csky-cklink.inf"
+    MessageBox MB_ICONEXCLAMATION|MB_OK "未找到 CK-Link 调试驱动文件。调试功能可能无法识别板卡。"
+    Return
+  ${EndIf}
+
+  DetailPrint "Installing CK-Link debug drivers..."
+  ${If} ${RunningX64}
+    ${DisableX64FSRedirection}
+  ${EndIf}
+  nsExec::ExecToStack '"$SYSDIR\pnputil.exe" /add-driver "$INSTDIR\riscv_toolkit\debugger\T-HeadDebugServer_V5.16.6\drivers\*.inf" /subdirs /install'
+  Pop $0
+  Pop $1
+  ${If} ${RunningX64}
+    ${EnableX64FSRedirection}
+  ${EndIf}
+  DetailPrint "$1"
+  ${If} $0 != 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK "CK-Link 调试驱动安装失败，退出码：$0$\r$\n$1$\r$\n请确认安装程序以管理员权限运行，或手动安装：$INSTDIR\riscv_toolkit\debugger\T-HeadDebugServer_V5.16.6\drivers\csky-cklink.inf"
+  ${EndIf}
+FunctionEnd
+
 Function un.CheckRRISEClosed
   nsExec::ExecToStack '"$SYSDIR\cmd.exe" /C tasklist /FI "IMAGENAME eq KDevelop.exe" /NH | findstr /I /C:"KDevelop.exe" >NUL'
   Pop $0
@@ -75,6 +97,7 @@ Section "KDevelop application" SEC_APP
   Delete "$LOCALAPPDATA\kdevappwizard\template_descriptions\riscv_ifft_layout.kdevtemplate"
   SetOutPath "$INSTDIR"
   File /r "${APP_SOURCE}\app\*.*"
+  Call InstallCkLinkDrivers
 
   CreateDirectory "$LOCALAPPDATA\kdevappwizard\template_descriptions"
   CopyFiles /SILENT "$INSTDIR\bin\data\kdevappwizard\template_descriptions\riscv_layout.kdevtemplate" "$LOCALAPPDATA\kdevappwizard\template_descriptions\riscv_layout.kdevtemplate"

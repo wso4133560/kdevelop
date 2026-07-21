@@ -8,6 +8,7 @@ Produce a single installer exe that:
 
 - installs the prepared KDevelop runtime tree,
 - bundles Qt/KF/Craft runtime dependencies so users do not configure Qt environment variables manually,
+- installs the bundled CK-Link debug drivers for T-Head DebugServer,
 - provides a selectable CP210x USB-to-UART driver component,
 - installs `pics\清科芯擎LOGO-中英文组合-黑.svg` and uses a generated `pics\rrise-logo.ico` for the installer, shortcuts, and uninstall entry,
 - creates shortcuts that start `KDevelop.exe`, a launcher that sets process-local runtime paths before starting `bin\kdevelop.exe`.
@@ -66,6 +67,8 @@ The packaged app root contains `KDevelop.exe`. This is not the real KDevelop bin
 These variables are not written globally to the user machine.
 
 The packaged app root also contains `riscv_toolkit\`, so templates can reference a stable installed path such as `C:\Program Files\RRISE\riscv_toolkit`.
+
+The installer runs `pnputil` against the bundled CK-Link driver directory under `riscv_toolkit\debugger\T-HeadDebugServer_V5.16.6\drivers`, so a clean Windows machine does not need a separately preinstalled csky/CK-Link debug driver before using the debugger.
 
 ## CP210x driver option
 

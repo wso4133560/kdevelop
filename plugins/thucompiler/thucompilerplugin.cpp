@@ -608,6 +608,7 @@ private Q_SLOTS:
         }
 
         m_expectedHeaderPaths.clear();
+        m_expectedReportPaths.clear();
         QStringList args;
         if (m_mode == CompileMode::Fft) {
             args = {QStringLiteral("/c"), QStringLiteral("call"), compileBatPath(), QStringLiteral("-FFT"), m_fftPotCombo->currentData().toString()};
@@ -634,15 +635,14 @@ private Q_SLOTS:
             scriptLines << QStringLiteral("@echo off");
             scriptLines << QStringLiteral("setlocal");
             for (const QString& file : std::as_const(files)) {
-                const QString headerPath = QDir(outputDir).filePath(QFileInfo(file).completeBaseName() + QStringLiteral(".h"));
+                const QString baseName = QFileInfo(file).completeBaseName();
+                const QString headerPath = QDir(outputDir).filePath(baseName + QStringLiteral(".h"));
                 m_expectedHeaderPaths << headerPath;
-                scriptLines << QStringLiteral("call %1 -THC %2 %3").arg(quoteCmdArg(compileBatPath()), opt, quoteCmdArg(file));
-                scriptLines << QStringLiteral("if errorlevel 1 exit /b %errorlevel%");
-                scriptLines << QStringLiteral("if not exist %1 (").arg(quoteCmdArg(headerPath));
-                scriptLines << QStringLiteral("  echo ERROR: expected header not generated: %1").arg(QDir::toNativeSeparators(headerPath));
-                scriptLines << QStringLiteral("  exit /b 1");
-                scriptLines << QStringLiteral(")");
+                m_expectedReportPaths << QDir(outputDir).filePath(baseName + QStringLiteral(".report"));
             }
+            scriptLines << QStringLiteral("call %1 -THC %2 %3")
+                               .arg(quoteCmdArg(compileBatPath()), opt, quoteCmdArg(files.join(QStringLiteral(";"))));
+            scriptLines << QStringLiteral("if errorlevel 1 exit /b %errorlevel%");
             scriptLines << QStringLiteral("exit /b 0");
 
             QFile scriptFile(m_compileScriptPath);
@@ -695,19 +695,24 @@ private Q_SLOTS:
     void processFinished(int exitCode, QProcess::ExitStatus exitStatus)
     {
         bool ok = exitStatus == QProcess::NormalExit && exitCode == 0;
-        QStringList missingHeaders;
+        QStringList missingOutputs;
         if (ok) {
             for (const QString& headerPath : std::as_const(m_expectedHeaderPaths)) {
                 if (!QFileInfo::exists(headerPath)) {
-                    missingHeaders << headerPath;
+                    missingOutputs << headerPath;
+                }
+            }
+            for (const QString& reportPath : std::as_const(m_expectedReportPaths)) {
+                if (!QFileInfo::exists(reportPath)) {
+                    missingOutputs << reportPath;
                 }
             }
         }
-        if (!missingHeaders.isEmpty()) {
+        if (!missingOutputs.isEmpty()) {
             ok = false;
-            appendOutput(QStringLiteral("[ERROR] THC header files were not generated:\n"));
-            for (const QString& headerPath : std::as_const(missingHeaders)) {
-                appendOutput(QStringLiteral("  %1\n").arg(QDir::toNativeSeparators(headerPath)));
+            appendOutput(QStringLiteral("[ERROR] THC output files were not generated:\n"));
+            for (const QString& outputPath : std::as_const(missingOutputs)) {
+                appendOutput(QStringLiteral("  %1\n").arg(QDir::toNativeSeparators(outputPath)));
             }
         }
         appendOutput(ok ? QStringLiteral("[INFO] 编译成功。\n") : QStringLiteral("[ERROR] 编译失败，退出码：%1\n").arg(exitCode));
@@ -876,6 +881,7 @@ private:
     QString m_outputDirectory;
     QString m_compileScriptPath;
     QStringList m_expectedHeaderPaths;
+    QStringList m_expectedReportPaths;
 };
 
 class ThuCompilerPlugin : public KDevelop::IPlugin
