@@ -63,13 +63,13 @@ static std::wstring getEnv(const wchar_t *name)
     return value;
 }
 
-static void prependEnv(const wchar_t *name, const std::wstring &prefix)
+static void appendEnv(const wchar_t *name, const std::wstring &suffix)
 {
     const auto current = getEnv(name);
     if (current.empty()) {
-        SetEnvironmentVariableW(name, prefix.c_str());
+        SetEnvironmentVariableW(name, suffix.c_str());
     } else {
-        SetEnvironmentVariableW(name, (prefix + L";" + current).c_str());
+        SetEnvironmentVariableW(name, (current + L";" + suffix).c_str());
     }
 }
 
@@ -90,8 +90,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     const std::wstring root = dirname(launcherPath);
     const std::wstring binDir = root + L"\\bin";
     const std::wstring toolkitRoot = root + L"\\riscv_toolkit";
-    const std::wstring toolkitMsysBin = root + L"\\riscv_toolkit\\runtime\\msys_bin";
-    const std::wstring toolkitMsysRootBin = root + L"\\riscv_toolkit\\runtime\\msys_root\\bin";
     const std::wstring thuCompilerRoot = root + L"\\thu-compiler";
     const std::wstring kdevelopExe = binDir + L"\\kdevelop.exe";
 
@@ -99,9 +97,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         return showError(L"Cannot find " + kdevelopExe);
     }
 
-    prependEnv(L"PATH", binDir);
-    prependEnv(L"PATH", toolkitMsysRootBin);
-    prependEnv(L"PATH", toolkitMsysBin);
+    appendEnv(L"PATH", binDir);
     SetEnvironmentVariableW(L"RRISE_TOOLKIT_ROOT", toolkitRoot.c_str());
     SetEnvironmentVariableW(L"THU_COMPILER_ROOT", thuCompilerRoot.c_str());
     SetEnvironmentVariableW(L"KDEDIRS", root.c_str());

@@ -1,0 +1,10 @@
+{
+    "KPlugin": {
+        "Category": "Utilities",
+        "Description": "Analyzes GReP/MUSIC LaTeX PE schedules with a native Qt timeline.",
+        "Icon": "view-calendar-timeline",
+        "Name": "PE Timeline Analyzer"
+    },
+    "X-KDevelop-Category": "Global",
+    "X-KDevelop-Mode": "GUI"
+}

@@ -20,6 +20,7 @@
 #include "custombuildsystemplugin.h"
 #include "configconstants.h"
 
+#include <QDateTime>
 #include <QDir>
 #include <QProcessEnvironment>
 
@@ -77,6 +78,29 @@ QString resolveConfiguredCommand(const QString& rawValue)
     }
 
     return expanded;
+}
+
+QString formatElapsedTime(qint64 elapsedMilliseconds)
+{
+    const qint64 hours = elapsedMilliseconds / (60 * 60 * 1000);
+    elapsedMilliseconds %= 60 * 60 * 1000;
+    const qint64 minutes = elapsedMilliseconds / (60 * 1000);
+    elapsedMilliseconds %= 60 * 1000;
+    const qint64 seconds = elapsedMilliseconds / 1000;
+    const qint64 milliseconds = elapsedMilliseconds % 1000;
+
+    return QStringLiteral("%1:%2:%3.%4")
+        .arg(hours, 2, 10, QLatin1Char('0'))
+        .arg(minutes, 2, 10, QLatin1Char('0'))
+        .arg(seconds, 2, 10, QLatin1Char('0'))
+        .arg(milliseconds, 3, 10, QLatin1Char('0'));
+}
+
+QString buildCompletionMessage(const QElapsedTimer& timer)
+{
+    const QString completedAt = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+    const QString elapsed = formatElapsedTime(timer.isValid() ? timer.elapsed() : 0);
+    return i18n("Build completed at %1, elapsed %2", completedAt, elapsed);
 }
 }
 
@@ -205,6 +229,7 @@ void CustomBuildJob::start()
         connect( exec, &CommandExecutor::receivedStandardOutput, model, &OutputModel::appendLines );
 
         model->appendLine(QStringLiteral("%1> %2 %3").arg(builddir, cmd, arguments));
+        buildTimer.start();
         exec->start();
     }
 }
@@ -229,6 +254,9 @@ void CustomBuildJob::procError( QProcess::ProcessError err )
             setError( UnknownExecError );
             setErrorText( i18n( "Unknown error executing command." ) );
         }
+        if (type == CustomBuildSystemTool::Build) {
+            model()->appendLine(buildCompletionMessage(buildTimer));
+        }
     }
     emitResult();
 }
@@ -247,6 +275,9 @@ void CustomBuildJob::procFinished(int code)
         model()->appendLine( i18n( "*** Failed ***" ) );
     } else {
         model()->appendLine( i18n( "*** Finished ***" ) );
+    }
+    if (type == CustomBuildSystemTool::Build) {
+        model()->appendLine(buildCompletionMessage(buildTimer));
     }
     emitResult();
 }

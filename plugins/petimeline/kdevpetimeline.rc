@@ -1,0 +1,8 @@
+<!DOCTYPE gui SYSTEM "kpartgui.dtd">
+<gui name="KDevPeTimeline" version="1" translationDomain="kdevpetimeline">
+  <MenuBar>
+    <Menu name="tools">
+      <Action name="show_pe_timeline" />
+    </Menu>
+  </MenuBar>
+</gui>

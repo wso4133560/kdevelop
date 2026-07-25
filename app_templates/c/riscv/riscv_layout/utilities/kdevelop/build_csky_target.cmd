@@ -1,6 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
+for /f %%%%I in ('powershell.exe -NoProfile -Command "[DateTime]::UtcNow.Ticks"') do set "BUILD_START_TICKS=%%%%I"
+
 set "TARGET_NAME=%~1"
 if "%TARGET_NAME%"=="" set "TARGET_NAME=%{APPNAMELC}"
 
@@ -47,5 +49,8 @@ if not "%BUILD_RC%"=="0" (
     echo WARNING: make returned %BUILD_RC%, but core outputs exist.
 )
 
+for %%%%I in ("%PROJECT_DIR%\Obj\%{APPNAMELC}.elf") do set "ELF_SIZE_BYTES=%%%%~zI"
+powershell.exe -NoProfile -Command "$bytes = [int64]$env:ELF_SIZE_BYTES; if ($bytes -ge 1MB) { Write-Host ('ELF file size: {0:N2} MB' -f ($bytes / 1MB)) } elseif ($bytes -ge 1KB) { Write-Host ('ELF file size: {0:N2} KB' -f ($bytes / 1KB)) } else { Write-Host ('ELF file size: {0} bytes' -f $bytes) }"
+powershell.exe -NoProfile -Command "$completed = Get-Date; $elapsed = [TimeSpan]::FromTicks([DateTime]::UtcNow.Ticks - [int64]$env:BUILD_START_TICKS); Write-Host ('Build completed at {0:yyyy-MM-dd HH:mm:ss}, elapsed {1:hh\:mm\:ss\.fff}' -f $completed, $elapsed)"
 echo SUCCESS: built %TARGET_NAME%
 exit /b 0

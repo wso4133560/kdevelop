@@ -9,6 +9,7 @@
 
 #include <outputview/outputjob.h>
 #include "custombuildsystemconfig.h"
+#include <QElapsedTimer>
 #include <QProcess>
 
 class CustomBuildSystem;
@@ -53,6 +54,7 @@ private:
     QString builddir;
     QUrl installPrefix;
     KDevelop::CommandExecutor* exec;
+    QElapsedTimer buildTimer;
     bool killed;
     bool enabled;
 };
