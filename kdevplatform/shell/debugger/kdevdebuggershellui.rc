@@ -1,5 +1,5 @@
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui name="kdevdebuggershellui" version="10" translationDomain="kdevplatform">
+<gui name="kdevdebuggershellui" version="11" translationDomain="kdevplatform">
     <MenuBar>
         <Menu name="run">
             <Separator group="debug"/>
@@ -24,6 +24,7 @@
     <ToolBar name="debugToolBar">
         <text>Debugger Toolbar</text>
         <Action name="debug_continue"/>
+        <Action name="debug_pause"/>
         <Action name="debug_stepover"/>
         <Action name="debug_stepinto"/>
         <Action name="debug_stepout"/>

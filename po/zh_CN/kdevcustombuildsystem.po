@@ -194,6 +194,11 @@ msgid ""
 "The given arguments would need a real shell, this is not supported currently."
 msgstr "给定的参数需要一个真实的 shell，现在尚未支持。"
 
+#: custombuildjob.cpp:233
+#, kde-format
+msgid "A build is already running in \"%1\"."
+msgstr "“%1”中已有构建正在运行。"
+
 #: custombuildjob.cpp:166
 #, kde-format
 msgid "Failed to start command."

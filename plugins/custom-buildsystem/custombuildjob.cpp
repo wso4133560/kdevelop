@@ -23,10 +23,26 @@
 #include <QDateTime>
 #include <QDir>
 #include <QProcessEnvironment>
+#include <QSet>
 
 using namespace KDevelop;
 
 namespace {
+QSet<QString>& activeBuildDirectories()
+{
+    static QSet<QString> directories;
+    return directories;
+}
+
+QString buildDirectoryKey(const QString& path)
+{
+    QString key = QDir::cleanPath(QDir(path).absolutePath());
+#ifdef Q_OS_WIN
+    key = key.toCaseFolded();
+#endif
+    return key;
+}
+
 QString expandWindowsEnvironmentVariables(QString value)
 {
 #ifdef Q_OS_WIN
@@ -108,6 +124,8 @@ CustomBuildJob::CustomBuildJob( CustomBuildSystem* plugin, KDevelop::ProjectBase
     : OutputJob( plugin )
     , type( t )
     , exec(nullptr)
+    , resultReported(false)
+    , completionPending(false)
     , killed( false )
     , enabled( false )
 {
@@ -168,6 +186,12 @@ CustomBuildJob::CustomBuildJob( CustomBuildSystem* plugin, KDevelop::ProjectBase
     setTitle(title);
     setObjectName(title);
     setDelegate( new KDevelop::OutputDelegate );
+
+}
+
+CustomBuildJob::~CustomBuildJob()
+{
+    releaseBuildDirectory();
 }
 
 void CustomBuildJob::start()
@@ -175,17 +199,17 @@ void CustomBuildJob::start()
     if( type == CustomBuildSystemTool::Undefined ) {
         setError( UndefinedBuildType );
         setErrorText( i18n( "Undefined Build type" ) );
-        emitResult();
+        requestFinish();
     } else if( cmd.isEmpty() ) {
         setError( NoCommand );
         setErrorText(i18n("No command given for custom %1 tool in project \"%2\".",
             CustomBuildSystemTool::toolName(type), projectName));
-        emitResult();
+        requestFinish();
     } else if( !enabled ) {
         setError( ToolDisabled );
         setErrorText(i18n("The custom %1 tool in project \"%2\" is disabled",
             CustomBuildSystemTool::toolName(type), projectName));
-        emitResult();
+        requestFinish();
     } else {
         // prepend the command name to the argument string
         // so that splitArgs works correctly
@@ -196,12 +220,19 @@ void CustomBuildJob::start()
         if( err != KShell::NoError ) {
             setError( WrongArgs );
             setErrorText( i18n( "The given arguments would need a real shell, this is not supported currently." ) );
-            emitResult();
+            requestFinish();
             return;
         }
         // and remove the command name back out of the split argument list
         Q_ASSERT(!strargs.isEmpty());
         strargs.removeFirst();
+
+        if (!reserveBuildDirectory()) {
+            setError(BuildAlreadyRunning);
+            setErrorText(i18n("A build is already running in \"%1\".", builddir));
+            requestFinish();
+            return;
+        }
 
         setStandardToolView( KDevelop::IOutputView::BuildView );
         setBehaviours( KDevelop::IOutputView::AllowUserClose | KDevelop::IOutputView::AutoScroll );
@@ -237,12 +268,18 @@ void CustomBuildJob::start()
 bool CustomBuildJob::doKill()
 {
     killed = true;
-    exec->kill();
+    if (exec) {
+        exec->kill();
+    }
     return true;
 }
 
 void CustomBuildJob::procError( QProcess::ProcessError err )
 {
+    if (resultReported || completionPending) {
+        return;
+    }
+
     if( !killed ) {
         if( err == QProcess::FailedToStart ) {
             setError( FailedToStart );
@@ -255,10 +292,12 @@ void CustomBuildJob::procError( QProcess::ProcessError err )
             setErrorText( i18n( "Unknown error executing command." ) );
         }
         if (type == CustomBuildSystemTool::Build) {
-            model()->appendLine(buildCompletionMessage(buildTimer));
+            if (auto* outputModel = model()) {
+                outputModel->appendLine(buildCompletionMessage(buildTimer));
+            }
         }
     }
-    emitResult();
+    requestFinish();
 }
 
 KDevelop::OutputModel* CustomBuildJob::model()
@@ -268,17 +307,75 @@ KDevelop::OutputModel* CustomBuildJob::model()
 
 void CustomBuildJob::procFinished(int code)
 {
+    if (resultReported || completionPending) {
+        return;
+    }
+
+    auto* outputModel = model();
     //TODO: Make this configurable when the first report comes in from a tool
     //      where non-zero does not indicate error status
     if( code != 0 ) {
         setError( FailedShownError );
-        model()->appendLine( i18n( "*** Failed ***" ) );
-    } else {
-        model()->appendLine( i18n( "*** Finished ***" ) );
+        if (outputModel) {
+            outputModel->appendLine( i18n( "*** Failed ***" ) );
+        }
+    } else if (outputModel) {
+        outputModel->appendLine( i18n( "*** Finished ***" ) );
     }
-    if (type == CustomBuildSystemTool::Build) {
-        model()->appendLine(buildCompletionMessage(buildTimer));
+    if (type == CustomBuildSystemTool::Build && outputModel) {
+        outputModel->appendLine(buildCompletionMessage(buildTimer));
     }
+    requestFinish();
+}
+
+void CustomBuildJob::requestFinish()
+{
+    if (resultReported || completionPending) {
+        return;
+    }
+
+    completionPending = true;
+    QMetaObject::invokeMethod(this, [this] {
+        finishJob();
+    }, Qt::QueuedConnection);
+}
+
+bool CustomBuildJob::reserveBuildDirectory()
+{
+    if (type != CustomBuildSystemTool::Build || builddir.isEmpty()) {
+        return true;
+    }
+
+    const QString key = buildDirectoryKey(builddir);
+    auto& directories = activeBuildDirectories();
+    if (directories.contains(key)) {
+        return false;
+    }
+
+    directories.insert(key);
+    reservedBuildDirectory = key;
+    return true;
+}
+
+void CustomBuildJob::releaseBuildDirectory()
+{
+    if (reservedBuildDirectory.isEmpty()) {
+        return;
+    }
+
+    activeBuildDirectories().remove(reservedBuildDirectory);
+    reservedBuildDirectory.clear();
+}
+
+void CustomBuildJob::finishJob()
+{
+    if (resultReported) {
+        return;
+    }
+
+    resultReported = true;
+    completionPending = false;
+    releaseBuildDirectory();
     emitResult();
 }
 

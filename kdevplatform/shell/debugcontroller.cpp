@@ -318,6 +318,7 @@ void DebugController::addSession(IDebugSession* session)
     }
     auto* const previousSession = m_currentSession;
     m_currentSession = session;
+    m_raiseDisassemblyAfterInterrupt = false;
 
     connect(session, &IDebugSession::stateChanged, this, &DebugController::debuggerStateChanged);
     connect(session, &IDebugSession::showStepInSource, this, &DebugController::showStepInSource);
@@ -414,6 +415,15 @@ void DebugController::debuggerStateChanged(KDevelop::IDebugSession::DebuggerStat
                    << "changed to" << state;
     if (session == m_currentSession) {
         updateDebuggerState(state, session);
+
+        if (state == IDebugSession::PausedState && m_raiseDisassemblyAfterInterrupt) {
+            m_raiseDisassemblyAfterInterrupt = false;
+            if (!Core::self()->shuttingDown()) {
+                Core::self()->uiController()->raiseToolView(QStringLiteral("org.kdevelop.debugger.DisassemblerView"));
+            }
+        } else if (state == IDebugSession::StoppedState || state == IDebugSession::EndedState) {
+            m_raiseDisassemblyAfterInterrupt = false;
+        }
     }
 
     if (state == IDebugSession::EndedState) {
@@ -549,6 +559,7 @@ void DebugController::stopDebugger() {
 }
 void DebugController::interruptDebugger() {
     if (m_currentSession) {
+        m_raiseDisassemblyAfterInterrupt = m_currentSession->state() == IDebugSession::ActiveState;
         m_currentSession->interruptDebugger();
     }
 }

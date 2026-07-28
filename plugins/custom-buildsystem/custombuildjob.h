@@ -32,10 +32,12 @@ public:
         Crashed,
         WrongArgs,
         ToolDisabled,
-        NoCommand
+        NoCommand,
+        BuildAlreadyRunning
     };
     
     CustomBuildJob( CustomBuildSystem*, KDevelop::ProjectBaseItem*, CustomBuildSystemTool::ActionType t );
+    ~CustomBuildJob() override;
     void start() override;
     bool doKill() override;
 
@@ -45,6 +47,10 @@ private Q_SLOTS:
     void procFinished(int);
     void procError( QProcess::ProcessError );
 private:
+    bool reserveBuildDirectory();
+    void releaseBuildDirectory();
+    void requestFinish();
+    void finishJob();
     KDevelop::OutputModel* model();
     CustomBuildSystemTool::ActionType type;
     QString projectName;
@@ -55,6 +61,9 @@ private:
     QUrl installPrefix;
     KDevelop::CommandExecutor* exec;
     QElapsedTimer buildTimer;
+    QString reservedBuildDirectory;
+    bool resultReported;
+    bool completionPending;
     bool killed;
     bool enabled;
 };
