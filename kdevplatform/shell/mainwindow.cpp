@@ -27,6 +27,9 @@
 #include <QUrl>
 
 #include <KActionCollection>
+#include <KAboutApplicationDialog>
+#include <KAboutData>
+#include <KHelpMenu>
 #include <KLocalizedString>
 #include <KShortcutsDialog>
 #include <KTextEditor/Document>
@@ -68,6 +71,28 @@
 using namespace KDevelop;
 
 namespace {
+
+KAboutData rriseAboutDialogData()
+{
+    const KAboutData& applicationData = KAboutData::applicationData();
+    const auto licenses = applicationData.licenses();
+    const auto primaryLicense = licenses.isEmpty() ? KAboutLicense::Unknown : licenses.constFirst().key();
+
+    KAboutData aboutData(applicationData.componentName(),
+                         applicationData.displayName(),
+                         applicationData.version(),
+                         applicationData.shortDescription(),
+                         primaryLicense,
+                         applicationData.copyrightStatement(),
+                         applicationData.otherText(),
+                         applicationData.homepage(),
+                         applicationData.bugAddress());
+    aboutData.setProgramLogo(applicationData.programLogo());
+    for (qsizetype index = 1; index < licenses.size(); ++index) {
+        aboutData.addLicense(licenses.at(index).key());
+    }
+    return aboutData;
+}
 
 QColor defaultColor(const QPalette& palette)
 {
@@ -722,8 +747,22 @@ void MainWindow::createGUI(KParts::Part* part)
 {
     Sublime::MainWindow::setWindowTitleHandling(false);
     Sublime::MainWindow::createGUI(part);
+    const auto helpMenus = findChildren<KHelpMenu*>();
+    for (KHelpMenu* helpMenu : helpMenus) {
+        connect(helpMenu, &KHelpMenu::showAboutApplication,
+                this, &MainWindow::showRriseAboutDialog, Qt::UniqueConnection);
+    }
     localizeTopLevelMenus();
     QTimer::singleShot(0, this, &MainWindow::localizeTopLevelMenus);
+}
+
+void MainWindow::showRriseAboutDialog()
+{
+    const KAboutData aboutData = rriseAboutDialogData();
+    const auto options = KAboutApplicationDialog::HideLibraries
+        | KAboutApplicationDialog::HideTranslators;
+    KAboutApplicationDialog dialog(aboutData, options, this);
+    dialog.exec();
 }
 
 void MainWindow::localizeTopLevelMenus()

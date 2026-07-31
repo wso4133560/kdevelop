@@ -90,6 +90,7 @@ protected Q_SLOTS:
 private Q_SLOTS:
     void documentActivated(const QPointer<KTextEditor::Document>& textDocument);
     void updateCaption();
+    void showRriseAboutDialog();
 
     void updateTabColor(IDocument* doc);
     void updateAllTabColors();

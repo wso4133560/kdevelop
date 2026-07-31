@@ -15,7 +15,6 @@
 */
 
 #include "config-kdevelop.h"
-#include "kdevelop_version.h"
 
 #include "urlinfo.h"
 
@@ -29,11 +28,13 @@
 #endif
 
 #include <QApplication>
+#include <QDate>
 #include <QElapsedTimer>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
 #include <QFileInfo>
 #include <QIcon>
+#include <QLocale>
 #include <QProcessEnvironment>
 #include <QSessionManager>
 #include <QTextStream>
@@ -84,6 +85,13 @@ QString serializeOpenFilesMessage(const QVector<UrlInfo> &infos)
     return QString::fromLatin1(message.toHex());
 }
 #endif
+
+QString rriseBuildDate()
+{
+    const QString compilerDate = QString::fromLatin1(__DATE__).simplified();
+    const QDate buildDate = QLocale::c().toDate(compilerDate, QStringLiteral("MMM d yyyy"));
+    return buildDate.isValid() ? buildDate.toString(QStringLiteral("yyyy.MM.dd")) : compilerDate;
+}
 
 QString readRrisePackageTime()
 {
@@ -428,11 +436,12 @@ int main( int argc, char *argv[] )
 
     KLocalizedString::setApplicationDomain(QByteArrayLiteral("kdevelop"));
     const QIcon rriseApplicationIcon = loadRriseApplicationIcon();
+    const QString buildDateVersion = rriseBuildDate();
 
     KAboutData aboutData(QStringLiteral("kdevelop"), i18n("RRISE"),
-                         QStringLiteral(KDEVELOP_VERSION_STRING " (" RELEASE_SERVICE_VERSION_STRING ")"),
+                         buildDateVersion,
                          i18n("The RRISE Integrated Development Environment"), KAboutLicense::GPL,
-                         i18n("Copyright 1999-%1, The KDevelop developers", QStringLiteral("2025")), QString(),
+                         QString(), QString(),
                          QStringLiteral("https://www.rrise.com/"));
     const QString rrisePackageTime = readRrisePackageTime();
     if (!rrisePackageTime.isEmpty()) {
