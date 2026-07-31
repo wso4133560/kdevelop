@@ -26,7 +26,7 @@ The most recent work addresses four related RRISE debugger issues.
    - `DisassembleWidget` now refreshes on `inferiorStopped` and evaluates `$pc` as a fallback, then disassembles around that address.
 
 4. Source and assembly stepping are selected explicitly.
-   - The Disassemble/Registers view has a checkable button labelled `保持汇编调试` or `取消汇编调试`.
+   - The Disassemble/Registers view has a checkable button labelled `汇编调试` or `非汇编调试`.
    - When assembly stepping is enabled, normal Step Over / Step Into and `F10` / `F11` send `-exec-step-instruction` (`stepi`).
    - When it is disabled, the same actions retain source-level `next` / `step` behavior.
    - The setting is persisted in the `Disassemble/Registers View` config group and published through the application property `rriseInstructionSteppingEnabled`.
@@ -92,8 +92,8 @@ NSIS compresses about 1.8 GB of staged content and normally runs for several min
 2. Connect the CK-Link board and start a normal remote debug session.
 3. Stop at a breakpoint, then open Disassemble/Registers. The IDE must not crash.
 4. Continue execution, click Interrupt, and verify the disassembly view is raised and shows instructions around the stopped program counter.
-5. Enable `保持汇编调试`, then press `F10` or `F11`; verify exactly one assembly instruction is executed.
-6. Select `取消汇编调试`, then press `F10` or `F11`; verify source-level stepping is used.
+5. Enable `汇编调试`, then press `F10` or `F11`; verify exactly one assembly instruction is executed.
+6. Select `非汇编调试`, then press `F10` or `F11`; verify source-level stepping is used.
 
 ## Known constraints and troubleshooting
 

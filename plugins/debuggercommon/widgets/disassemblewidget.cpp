@@ -361,8 +361,8 @@ void DisassembleWidget::setInstructionSteppingEnabled(bool enabled)
     qApp->setProperty(instructionSteppingProperty, enabled);
     m_config.writeEntry("InstructionSteppingEnabled", enabled);
     m_instructionSteppingButton->setText(enabled
-        ? QStringLiteral("保持汇编调试")
-        : QStringLiteral("取消汇编调试"));
+        ? QStringLiteral("汇编调试")
+        : QStringLiteral("非汇编调试"));
     m_instructionSteppingButton->setToolTip(enabled
         ? QStringLiteral("F10/F11 和顶部单步按钮将逐条执行汇编指令")
         : QStringLiteral("F10/F11 和顶部单步按钮将按源码单步执行"));
