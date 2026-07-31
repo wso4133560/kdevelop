@@ -270,6 +270,13 @@ void DebugSession::initializeDebugger()
     addCommand(MI::GdbSet, QStringLiteral("width 0"));
     addCommand(MI::GdbSet, QStringLiteral("height 0"));
 
+#ifdef Q_OS_WIN
+    // A GUI process cannot reliably deliver a console Ctrl+C to GDB on Windows.
+    // Keep GDB's MI interpreter responsive while the remote target is running so
+    // that MIDebugSession::interruptDebugger() can send -exec-interrupt directly.
+    addCommand(MI::GdbSet, QStringLiteral("mi-async on"));
+#endif
+
     addCommand(MI::SignalHandle, QStringLiteral("SIG32 pass nostop noprint"));
     addCommand(MI::SignalHandle, QStringLiteral("SIG41 pass nostop noprint"));
     addCommand(MI::SignalHandle, QStringLiteral("SIG42 pass nostop noprint"));

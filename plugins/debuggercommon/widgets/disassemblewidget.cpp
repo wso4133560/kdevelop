@@ -26,18 +26,29 @@
 #include <QShowEvent>
 #include <QHideEvent>
 #include <QAction>
+#include <QApplication>
 #include <QMenu>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
+#include <QToolButton>
+#include <QRegularExpression>
 #include <QSplitter>
 #include <QFontDatabase>
+#include <QKeyEvent>
 #include <QValidator>
 
 using namespace KDevMI;
 using namespace KDevMI::MI;
 
 namespace {
+constexpr auto instructionSteppingProperty = "rriseInstructionSteppingEnabled";
+
+bool instructionSteppingEnabled()
+{
+    return qApp && qApp->property(instructionSteppingProperty).toBool();
+}
+
 unsigned long addressFromString(QStringView stringAddress, bool* ok)
 {
     return stringAddress.toULong(ok, 16);
@@ -127,6 +138,7 @@ void SelectAddressDialog::updateOkState()
 
 DisassembleWindow::DisassembleWindow(QWidget *parent, DisassembleWidget* widget)
     : QTreeWidget(parent)
+    , m_widget(widget)
 {
     /*context menu commands */{
     m_selectAddrAction = new QAction(i18nc("@action", "Change &Address"), this);
@@ -165,6 +177,22 @@ DisassembleWindow::DisassembleWindow(QWidget *parent, DisassembleWidget* widget)
         m_runUntilCursor->setEnabled(false);
     });
     }
+}
+
+bool DisassembleWindow::event(QEvent* event)
+{
+    if (event->type() == QEvent::ShortcutOverride) {
+        const auto* const keyEvent = static_cast<QKeyEvent*>(event);
+        if (instructionSteppingEnabled() && keyEvent->modifiers() == Qt::NoModifier
+            && (keyEvent->key() == Qt::Key_F10 || keyEvent->key() == Qt::Key_F11)) {
+            // Consume the global source-level shortcut before it is triggered.
+            m_widget->stepSingleInstruction();
+            event->accept();
+            return true;
+        }
+    }
+
+    return QTreeWidget::event(event);
 }
 
 QString DisassembleWindow::selectedAddress() const
@@ -216,6 +244,7 @@ DisassembleWidget::DisassembleWidget(MIDebuggerPlugin*, QWidget* parent)
         //topLayout->setContentsMargins(0, 0, 0, 0);
 
         m_disassembleWindow = new DisassembleWindow(m_splitter, this);
+        m_disassembleWindow->setProperty("rriseInstructionSteppingContext", true);
 
         m_disassembleWindow->setWhatsThis(i18nc("@info:whatsthis", "<b>Machine code display</b><p>"
                         "A machine code view into your running "
@@ -242,6 +271,7 @@ DisassembleWidget::DisassembleWidget(MIDebuggerPlugin*, QWidget* parent)
         m_splitter->setContentsMargins(0, 0, 0, 0);
 
         m_registersManager = new RegistersManager(m_splitter);
+        m_registersManager->setProperty("rriseInstructionSteppingContext", true);
 
         m_config = KSharedConfig::openConfig()->group(QStringLiteral("Disassemble/Registers View"));
 
@@ -252,10 +282,29 @@ DisassembleWidget::DisassembleWidget(MIDebuggerPlugin*, QWidget* parent)
 
     }
 
+    auto* const steppingModeLayout = new QHBoxLayout;
+    steppingModeLayout->setContentsMargins(4, 2, 4, 2);
+    steppingModeLayout->addStretch();
+    m_instructionSteppingButton = new QToolButton(this);
+    m_instructionSteppingButton->setCheckable(true);
+    m_instructionSteppingButton->setIcon(QIcon::fromTheme(QStringLiteral("debug-step-into-instruction")));
+    m_instructionSteppingButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    steppingModeLayout->addWidget(m_instructionSteppingButton);
+    topLayout->insertLayout(0, steppingModeLayout);
+
+    connect(m_instructionSteppingButton, &QToolButton::toggled, this,
+            &DisassembleWidget::setInstructionSteppingEnabled);
+    const bool instructionSteppingInitiallyEnabled = m_config.readEntry("InstructionSteppingEnabled", false);
+    m_instructionSteppingButton->setChecked(instructionSteppingInitiallyEnabled);
+    // setChecked(false) does not emit toggled(), so initialize the visible
+    // label explicitly for both modes.
+    setInstructionSteppingEnabled(instructionSteppingInitiallyEnabled);
+
     setLayout(topLayout);
 
     setWindowIcon( QIcon::fromTheme(QStringLiteral("system-run"), windowIcon()) );
     setWindowTitle(i18nc("@title:window", "Disassemble/Registers View"));
+    setProperty("rriseInstructionSteppingContext", true);
 
     KDevelop::IDebugController* pDC=KDevelop::ICore::self()->debugController();
     Q_ASSERT(pDC);
@@ -296,6 +345,29 @@ void DisassembleWidget::runToCursor()
     }
 }
 
+void DisassembleWidget::stepSingleInstruction()
+{
+    auto* const session = currentSessionThatAcceptsCommands();
+    if (!session || session->state() != KDevelop::IDebugSession::PausedState || m_instructionStepPending) {
+        return;
+    }
+
+    m_instructionStepPending = true;
+    session->stepIntoInstruction();
+}
+
+void DisassembleWidget::setInstructionSteppingEnabled(bool enabled)
+{
+    qApp->setProperty(instructionSteppingProperty, enabled);
+    m_config.writeEntry("InstructionSteppingEnabled", enabled);
+    m_instructionSteppingButton->setText(enabled
+        ? QStringLiteral("保持汇编调试")
+        : QStringLiteral("取消汇编调试"));
+    m_instructionSteppingButton->setToolTip(enabled
+        ? QStringLiteral("F10/F11 和顶部单步按钮将逐条执行汇编指令")
+        : QStringLiteral("F10/F11 和顶部单步按钮将按源码单步执行"));
+}
+
 void DisassembleWidget::currentSessionChanged(KDevelop::IDebugSession* iSession,
                                               KDevelop::IDebugSession* iPreviousSession)
 {
@@ -308,6 +380,8 @@ void DisassembleWidget::currentSessionChanged(KDevelop::IDebugSession* iSession,
         // Clear out all addresses of the previous debug session because
         // they are unlikely to be valid or useful in the next session.
         m_upToDate = true;
+        m_programCounterRequestPending = false;
+        m_instructionStepPending = false;
         m_regionDisassemblyFlavorUpToDate = true;
         m_currentAddress.reset();
         m_regionFirst.reset();
@@ -323,9 +397,19 @@ void DisassembleWidget::currentSessionChanged(KDevelop::IDebugSession* iSession,
     m_registersManager->setSession(session);
 
     if (session) {
+        connect(session, &KDevelop::IDebugSession::stateChanged, this,
+                [this](KDevelop::IDebugSession::DebuggerState) { m_instructionStepPending = false; });
         connect(session, &MIDebugSession::showStepInSource,
                 this, &DisassembleWidget::slotShowStepInSource);
         connect(session,&MIDebugSession::showStepInDisassemble,this, &DisassembleWidget::update);
+        connect(session, &MIDebugSession::inferiorStopped, this, [this](const MI::AsyncRecord&) {
+            m_upToDate = false;
+            // A remote target can omit the frame field from *stopped or report a
+            // stale selected frame. Query the processor PC for the exact stop site.
+            refreshCurrentAddress(true);
+        });
+
+        refreshCurrentAddress();
     }
 }
 
@@ -489,15 +573,65 @@ void SelectAddressDialog::setAddress ( const QString& address )
 
 void DisassembleWidget::update(const QString &address)
 {
+    if (address.isEmpty()) {
+        return;
+    }
+
     m_currentAddress = address;
     m_upToDate = false;
     updateIfNeeded();
+}
+
+void DisassembleWidget::refreshCurrentAddress(bool forceDebuggerQuery)
+{
+    auto* const session = currentSessionThatAcceptsCommands();
+    if (!session) {
+        return;
+    }
+
+    if (!forceDebuggerQuery) {
+        if (const auto address = session->currentAddr(); !address.isEmpty()) {
+            update(address);
+            return;
+        }
+    }
+
+    if (!m_active || session->state() != KDevelop::IDebugSession::PausedState || m_programCounterRequestPending) {
+        return;
+    }
+
+    m_programCounterRequestPending = true;
+    session->addCommandWithCurrentSessionHandler(DataEvaluateExpression, QStringLiteral("$pc"), this,
+                                                 &DisassembleWidget::currentProgramCounterHandler, CmdHandlesError);
+}
+
+void DisassembleWidget::currentProgramCounterHandler(const ResultRecord& r)
+{
+    m_programCounterRequestPending = false;
+
+    if (r.reason != QLatin1String("done")) {
+        return;
+    }
+
+    const auto value = r[QStringLiteral("value")].literal();
+    static const QRegularExpression addressPattern(QStringLiteral(R"((0x[0-9A-Fa-f]+))"));
+    const auto match = addressPattern.match(value);
+    if (match.hasMatch()) {
+        update(match.captured(1));
+    } else {
+        qCWarning(DEBUGGERCOMMON) << "Cannot extract program counter from" << value;
+    }
 }
 
 void DisassembleWidget::updateIfNeeded()
 {
     if (!m_active) {
         return; // updating is not useful at this time, so postpone it to optimize
+    }
+
+    if (!m_currentAddress.isValid()) {
+        refreshCurrentAddress();
+        return;
     }
 
     if (!m_upToDate) {

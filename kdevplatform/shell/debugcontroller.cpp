@@ -11,6 +11,7 @@
 #include "debugcontroller.h"
 
 #include <QAction>
+#include <QApplication>
 
 #include <KActionCollection>
 #include <KLocalizedString>
@@ -42,6 +43,7 @@
 
 namespace {
 constexpr auto executionMark = KTextEditor::Document::MarkTypes::Execution;
+constexpr auto instructionSteppingProperty = "rriseInstructionSteppingEnabled";
 
 /**
  * @return the title of the Variables tool view
@@ -414,6 +416,9 @@ void DebugController::debuggerStateChanged(KDevelop::IDebugSession::DebuggerStat
     qCDebug(SHELL) << "debugger state of" << (session == m_currentSession ? "current" : "noncurrent") << session
                    << "changed to" << state;
     if (session == m_currentSession) {
+        // A state notification means that the previous step request has reached
+        // GDB. In particular, this releases the guard when the target stops.
+        m_stepCommandPending = false;
         updateDebuggerState(state, session);
 
         if (state == IDebugSession::PausedState && m_raiseDisassemblyAfterInterrupt) {
@@ -583,25 +588,54 @@ void DebugController::jumpToCursor() {
         m_currentSession->jumpToCursor();
     }
 }
+
+bool DebugController::canStep() const
+{
+    return m_currentSession && m_currentSession->state() == IDebugSession::PausedState && !m_stepCommandPending;
+}
+
 void DebugController::stepOver() {
-    if (m_currentSession) {
+    if (!canStep()) {
+        return;
+    }
+
+    m_stepCommandPending = true;
+    if (qApp->property(instructionSteppingProperty).toBool()) {
+        // "next instruction" intentionally skips over a called function, which
+        // can move the PC by many instructions. In the disassembly view both
+        // ordinary step actions must advance exactly one instruction.
+        m_currentSession->stepIntoInstruction();
+    } else {
         m_currentSession->stepOver();
     }
 }
 void DebugController::stepIntoInstruction() {
-    if (m_currentSession) {
-        m_currentSession->stepIntoInstruction();
+    if (!canStep()) {
+        return;
     }
+
+    m_stepCommandPending = true;
+    m_currentSession->stepIntoInstruction();
 }
 void DebugController::stepInto() {
-    if (m_currentSession) {
+    if (!canStep()) {
+        return;
+    }
+
+    m_stepCommandPending = true;
+    if (qApp->property(instructionSteppingProperty).toBool()) {
+        m_currentSession->stepIntoInstruction();
+    } else {
         m_currentSession->stepInto();
     }
 }
 void DebugController::stepOverInstruction() {
-    if (m_currentSession) {
-        m_currentSession->stepOverInstruction();
+    if (!canStep()) {
+        return;
     }
+
+    m_stepCommandPending = true;
+    m_currentSession->stepOverInstruction();
 }
 void DebugController::stepOut() {
     if (m_currentSession) {

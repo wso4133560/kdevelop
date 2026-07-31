@@ -83,6 +83,7 @@ private:
     void setupActions();
     void updateDebuggerState(KDevelop::IDebugSession::DebuggerState state, KDevelop::IDebugSession* session);
     void setContinueStartsDebug(bool startsDebug);
+    [[nodiscard]] bool canStep() const;
 
     QAction* m_continueDebugger = nullptr;
     //QAction* m_restartDebugger;
@@ -114,6 +115,9 @@ private:
     // Initialize to false to let setupActions() flip the value and initialize the UI properties of the action.
     bool m_continueStartsDebug = false;
     bool m_raiseDisassemblyAfterInterrupt = false;
+    // A step command starts the inferior asynchronously. Do not enqueue another
+    // step while the first one is still waiting for GDB to change state.
+    bool m_stepCommandPending = false;
 };
 
 }

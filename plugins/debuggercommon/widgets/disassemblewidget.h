@@ -24,6 +24,7 @@
 /***************************************************************************/
 
 class QSplitter;
+class QToolButton;
 
 namespace KDevelop {
     class IDebugSession;
@@ -77,6 +78,7 @@ public:
     void setDisassemblyFlavor(DisassemblyFlavor flavor);
 
 protected:
+   bool event(QEvent* event) override;
    void contextMenuEvent(QContextMenuEvent *e) override;
 
 private:
@@ -86,6 +88,7 @@ private:
     QAction* m_disassemblyFlavorAtt;
     QAction* m_disassemblyFlavorIntel;
     QActionGroup* m_disassemblyFlavorActionGroup;
+    DisassembleWidget* const m_widget;
 };
 
 class MIDebuggerPlugin;
@@ -116,6 +119,7 @@ public Q_SLOTS:
     void jumpToCursor();
     void runToCursor();
     void setDisassemblyFlavor(QAction* action);
+    void stepSingleInstruction();
 
 protected:
     void showEvent(QShowEvent*) override;
@@ -151,9 +155,13 @@ private:
 
     /// callbacks for GDBCommands
     void disassembleMemoryHandler(const MI::ResultRecord& r);
+    void currentProgramCounterHandler(const MI::ResultRecord& r);
     void setDisassemblyFlavorHandler(const MI::ResultRecord& r);
     void refreshRegionDisassemblyFlavorHandler(const MI::ResultRecord& r);
     void showDisassemblyFlavorHandler(const MI::ResultRecord& r);
+
+    void refreshCurrentAddress(bool forceDebuggerQuery = false);
+    void setInstructionSteppingEnabled(bool enabled);
 
     using AddressInteger = unsigned long;
 
@@ -216,12 +224,15 @@ private:
      * Whether the disassembly flavor of the currently displayed memory region is up to date.
      */
     bool m_regionDisassemblyFlavorUpToDate = true;
+    bool m_programCounterRequestPending = false;
+    bool m_instructionStepPending = false;
     StoredAddress m_currentAddress; ///< the address, at which the debugger last stopped/paused, or invalid address
     StoredAddress m_regionFirst; ///< the first address of the currently displayed memory region or invalid address
     StoredAddress m_regionLast; ///< the last address of the currently displayed memory region or invalid address
 
     RegistersManager* m_registersManager ;
 
+    QToolButton* m_instructionSteppingButton = nullptr;
     DisassembleWindow * m_disassembleWindow;
 
     SelectAddressDialog* m_dlg;

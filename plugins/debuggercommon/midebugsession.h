@@ -112,13 +112,6 @@ public:
     bool startDebugging(const InferiorStartupInfo& startupInfo);
 
     /**
-     * Perform debugger-specific checks before the UI switches into a debug run.
-     *
-     * @return whether debugging may proceed
-     */
-    virtual bool prepareDebugging(const InferiorStartupInfo& startupInfo);
-
-    /**
      * @return whether a command can be added to this session
      *
      * @note The session object itself may add certain commands (e.g. commands needed
@@ -128,8 +121,6 @@ public:
 
     bool debuggerStateIsOn(DBGStateFlags state) const;
     DBGStateFlags debuggerState() const;
-
-    [[nodiscard]] virtual bool preferHardwareBreakpoints() const;
 
     bool hasCrashed() const;
 
@@ -350,6 +341,21 @@ protected:
      * Load a core dump file.
      */
     virtual void loadCoreFile(const QString& coreFile) = 0;
+
+public:
+    /**
+     * Perform debugger-specific checks before the UI switches into a debug run.
+     *
+     * Keep newly added virtual functions after the original virtual interface so
+     * incrementally built debugger views cannot resolve an old slot incorrectly.
+     *
+     * @return whether debugging may proceed
+     */
+    virtual bool prepareDebugging(const InferiorStartupInfo& startupInfo);
+
+    [[nodiscard]] virtual bool preferHardwareBreakpoints() const;
+
+protected:
 
     /**
      * Display a given error message to the user and call stopDebugger().
