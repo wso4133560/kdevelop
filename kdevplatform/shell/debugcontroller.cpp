@@ -186,6 +186,7 @@ void DebugController::setupActions()
 
     QAction* action = m_continueDebugger = new QAction(this);
     setContinueStartsDebug(true);
+    ac->setDefaultShortcut(action, Qt::Key_F5);
     ac->addAction(QStringLiteral("debug_continue"), action);
     connect(action, &QAction::triggered, this, &DebugController::run);
 
