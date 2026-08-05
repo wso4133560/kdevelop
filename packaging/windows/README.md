@@ -8,6 +8,7 @@ Produce a single installer exe that:
 
 - installs the prepared KDevelop runtime tree,
 - bundles Qt/KF/Craft runtime dependencies so users do not configure Qt environment variables manually,
+- displays the Chinese RRISE main-program license and installs the complete license texts under `licenses\`,
 - installs the bundled CK-Link debug drivers for T-Head DebugServer,
 - provides a selectable CP210x USB-to-UART driver component,
 - installs `pics\清科芯擎LOGO-中英文组合-黑.svg` and uses a generated `pics\rrise-logo.ico` for the installer, shortcuts, and uninstall entry,
@@ -73,3 +74,4 @@ The installer runs `pnputil` against the bundled CK-Link driver directory under 
 ## CP210x driver option
 
 The NSIS script exposes `CP210x USB-to-UART driver` as an optional component. When selected, the installer extracts the CP210x driver files and runs the x64 or x86 Silicon Labs installer according to the target OS.
+The Silicon Labs license remains part of that optional driver payload and is not used as the RRISE main-program license page.

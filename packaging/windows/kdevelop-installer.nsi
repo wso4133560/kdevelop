@@ -25,7 +25,7 @@ SetCompressor /SOLID lzma
 !define MUI_UNICON "${APP_SOURCE}\app\pics\rrise-logo.ico"
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "${APP_SOURCE}\drivers\CP210x\SLAB_License_Agreement_VCP_Windows.txt"
+!insertmacro MUI_PAGE_LICENSE "${APP_SOURCE}\licenses\RRISE-LICENSE-zh_CN.txt"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -416,7 +416,7 @@ Function un.onInit
   Call un.CheckRRISEClosed
 FunctionEnd
 
-Section "KDevelop application" SEC_APP
+Section "RRISE 主程序" SEC_APP
   SectionIn RO
 
   Call CheckRRISEClosed
@@ -429,6 +429,9 @@ Section "KDevelop application" SEC_APP
   Delete "$LOCALAPPDATA\kdevappwizard\template_descriptions\riscv_ifft_layout.kdevtemplate"
   SetOutPath "$INSTDIR"
   File /r "${APP_SOURCE}\app\*.*"
+  SetOutPath "$INSTDIR\licenses"
+  File /r "${APP_SOURCE}\licenses\*.*"
+  SetOutPath "$INSTDIR"
   Call InstallCkLinkDrivers
 
   CreateDirectory "$LOCALAPPDATA\kdevappwizard\template_descriptions"

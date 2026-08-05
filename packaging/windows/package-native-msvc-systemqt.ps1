@@ -698,6 +698,8 @@ $logoSvg = $logoSvgCandidates[0].FullName
 $logoSvgName = $logoSvgCandidates[0].Name
 $launcherSource = Join-Path $PSScriptRoot "kdevelop-launcher.cpp"
 $nsisScript = Join-Path $PSScriptRoot "kdevelop-installer.nsi"
+$rriseLicense = Join-Path $PSScriptRoot "RRISE-LICENSE-zh_CN.txt"
+$licenseSourceDir = Join-Path $repoRoot "LICENSES"
 $qtBin = Join-Path $QtDir "bin"
 $windeployqt = Join-Path $qtBin "windeployqt.exe"
 $craftBin = Join-Path $CraftRoot "bin"
@@ -721,6 +723,8 @@ Require-Path $cp210xZip "CP210x driver zip"
 Require-Path $logoSvg "RRISE logo"
 Require-Path $launcherSource "Launcher source"
 Require-Path $nsisScript "NSIS script"
+Require-Path $rriseLicense "RRISE Chinese license"
+Require-Path $licenseSourceDir "Repository license directory"
 
 if ($ValidateOnly) {
     Write-Host "Validation passed."
@@ -730,12 +734,13 @@ if ($ValidateOnly) {
 $stagingRoot = Join-Path $OutputRoot "staging"
 $appPayload = Join-Path $stagingRoot "app"
 $driverPayload = Join-Path $stagingRoot "drivers\CP210x"
+$licensePayload = Join-Path $stagingRoot "licenses"
 $artifactDir = Join-Path $OutputRoot "artifacts"
 $installerPath = Join-Path $artifactDir $InstallerName
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 Remove-DirectoryInside $stagingRoot $OutputRoot
-New-Item -ItemType Directory -Force -Path $appPayload, $driverPayload, $artifactDir | Out-Null
+New-Item -ItemType Directory -Force -Path $appPayload, $driverPayload, $licensePayload, $artifactDir | Out-Null
 
 Write-Host "Copying KDevelop install tree..."
 Copy-Item -Path (Join-Path $InstallTree "*") -Destination $appPayload -Recurse -Force
@@ -811,6 +816,10 @@ Write-Host "Copying KF6 zh_CN translations..."
 Copy-Kf6ZhCnTranslations $CraftRoot $appPayload
 Write-Host "Overriding selected KF6 runtime DLLs with system Qt builds..."
 Copy-SystemQtKf6Overrides $systemQtKf6Bin (Join-Path $appPayload "bin")
+
+Write-Host "Copying RRISE license files..."
+Copy-Item -Path (Join-Path $licenseSourceDir "*") -Destination $licensePayload -Recurse -Force
+Copy-Item -LiteralPath $rriseLicense -Destination (Join-Path $licensePayload "RRISE-LICENSE-zh_CN.txt") -Force
 
 Write-Host "Expanding CP210x driver package..."
 Add-Type -AssemblyName System.IO.Compression.FileSystem
